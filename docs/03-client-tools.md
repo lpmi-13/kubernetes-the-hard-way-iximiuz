@@ -4,14 +4,21 @@ We need to install all the relevant binaries to your jumpbox (you _could_ instal
 
 ## Setting up the jumpbox server
 
+First, we need to get the ID of the playground that has the jumpbox.
+
 ```sh
-labctl playground start ubuntu-22-04
+JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | length == 1 and .[0].name == "jumpbox") | .id')
 ```
+
 and then we need to copy over the file with the installation URLs.
 
+```sh
+labctl cp ./downloads.txt $JUMPBOX_PLAYGROUND_ID:~/downloads.txt
 ```
-labctl cp ./downloads.txt $(labctl playground list | grep 22 | awk '{print $1}'):~/downloads.txt
-```
+
+and now we're ready to jump on there and install some tools.
+
+```sh
 wget -q --show-progress \
   --https-only \
   --timestamping \

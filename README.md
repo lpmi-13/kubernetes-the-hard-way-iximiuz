@@ -21,19 +21,21 @@ Component versions:
 
 Because we're interacting with the VMs slightly differently from a regular cloud provider, and the configuration is a bit custom, we need to do things a bit different from the regular tutorial.
 
-1) We create all the clusters. For now, we'll do 4 mini-lan-ubuntu playgrounds that each have 3 machines, and one standalone ubuntu-22-04 playground (that only has one machine in it).
+1) We create all the clusters. For now, we'll do 4 flexbox playgrounds that each have 3 machines (1 controller cluster and three worker node clusters), and one standalone flexbox playground (that only has one machine in it) as the jumpbox server.
 
 2) We install all the necessary tooling in the jumpbox.
+
+> We do this here so we can just install the tooling once and copy it over to all the other servers. Also so we don't need to clutter your local workstation with anything!
 
 3) We configure the networking. This is using tailscale and is going to be conceptually very simple, but we just need to track all the DNS names for each of the hosts. Maybe a scheme like:
 
 - jumpbox
-- controller-0{1..3}
-- worker-0{1..3}
-- worker-0{4..6}
-- worker-0{7..9}
+- controller-{1..3}
+- worker-{1..3}
+- worker-{4..6}
+- worker-{7..9}
 
-We need to set the hostnames as above, so that can probably be done in the provisioning script/commands/etc. Once those are configured, we can install/start tailscale on each node and they'll be able to contact each other using just the hostname as the DNS name (magic!).
+We also set the hostnames as above, so we can install/start tailscale on each node and they'll be able to contact each other using just the hostname as the DNS name (magic!).
 
 4) We set up the PKI certificate authority and distribute certs/keys/etc to each of the machines.
 
