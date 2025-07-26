@@ -236,7 +236,7 @@ First, go to your [admin settings](https://login.tailscale.com/admin/settings/ke
 Now you can put that in a local `.env` file for use in your environment vars.
 
 ```sh
-cp .env.example
+cp .env.example .env
 ```
 
 and add in the value for the auth key.
@@ -247,7 +247,7 @@ now we can add it to our env like so:
 source .env
 ```
 
-use that
+now you're ready to install tailscale on each of the workers, controllers, and jumpbox
 
 ```sh
 for playground_id in $(labctl playground list -q); do

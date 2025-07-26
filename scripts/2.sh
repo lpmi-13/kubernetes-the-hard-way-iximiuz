@@ -210,3 +210,12 @@ labctl playground start flexbox -f -<<EOF
           canStart:
               - anyone
 EOF
+
+source .env
+
+for playground_id in $(labctl playground list -q); do
+  for machine_name in $(labctl playground machines $playground_id | sed '1d'); do
+    SCRIPT=$(sed "s/TAILSCALE_AUTH_KEY_PLACEHOLDER/${TAILSCALE_AUTH_KEY//\"/\\\"}/" scripts/install_tailscale.sh)
+    echo "$SCRIPT" | labctl ssh $playground_id --machine $machine_name
+  done
+done
