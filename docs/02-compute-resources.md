@@ -224,3 +224,36 @@ labctl playground start flexbox -f -<<EOF
               - anyone
 EOF
 ```
+
+## Installing tailscale
+
+We're going to need tailscale so these nodes can see each other by the magic of tailscale DNS resolution.
+
+First, go to your [admin settings](https://login.tailscale.com/admin/settings/keys) and generate an ephemeral reusable key, and set the expiry to 1 day.
+
+![tailscale ephemeral key generation](/images/tailscale-keys.png)
+
+Now you can put that in a local `.env` file for use in your environment vars.
+
+```sh
+cp .env.example
+```
+
+and add in the value for the auth key.
+
+now we can add it to our env like so:
+
+```sh
+source .env
+```
+
+use that
+
+```sh
+for playground_id in $(labctl playground list -q); do
+  for machine_name in $(labctl playground machines $playground_id | sed '1d'); do
+    SCRIPT=$(sed "s/TAILSCALE_AUTH_KEY_PLACEHOLDER/${TAILSCALE_AUTH_KEY//\"/\\\"}/" install_tailscale.sh)
+    echo "$SCRIPT" | labctl ssh $playground_id --machine $machine_name
+  done
+done
+```

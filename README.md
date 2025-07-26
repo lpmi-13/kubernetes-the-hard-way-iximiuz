@@ -1,10 +1,13 @@
 # Kubernetes multi-cluster cluster
 
+This is heavily based on the Excellent [kubernetes the hard way](https://github.com/kelseyhightower/kubernetes-the-hard-way) by Kelsey Hightower.
+
 This is the working title of creating a mega-cluster on Iximiuz Labs via tailscale tailnet.
 
 The idea is that in the original k8s-the-hard-way, we had 3 control plan nodes and 3 worker nodes, but now we're going to have one cluster of control plane nodes (3) and three clusters of worker nodes (3 x 3)...all networked via tailscale.
 
 We'll also have one admin node in a standalone ubuntu playground to act as the jumpbox (a concept that Kelsey Hightower introduced in the later K8s the hard way walkthroughs to simplify the setup a bit, so I copied it here as well). This is the machine that we'll use to actually provision the k8s megacluster, and since it's also an ephemeral VM, there's no clean up to be done, just shut it down!
+
 
 ## Cluster Details
 
@@ -49,7 +52,7 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 9) We bootstrap the kubernetes worker nodes.
 
-10) We configure kubectl on the jumpbox for remote access.
+10) We configure kubectl on the jumpbox for remote access (we did this earlier I think, but let's leave it to confirm when we get to this step)
 
 11) We'll provision the pod networking routes.
 
