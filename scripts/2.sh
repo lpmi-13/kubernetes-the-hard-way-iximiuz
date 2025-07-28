@@ -1,3 +1,9 @@
+# just to keep this tidy, clean up any existing playgrounds first
+echo "checking for existing playgrounds to clean up..."
+for playground_id in $(labctl playground list -q); do
+  labctl playground stop $playground_id
+done
+
 # Set up 3 worker clusters with sequential worker numbering (1-9)
 for i in {1..3}; do
   # Calculate worker number range for this cluster
