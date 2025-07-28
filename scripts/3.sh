@@ -11,6 +11,8 @@ ssh-keygen -t ed25519 -C "laborant@jumpbox" -o -a 100 -f kubernetes.ed25519 -N "
 
 labctl cp ./kubernetes.ed25519 $JUMPBOX_PLAYGROUND_ID:~/.ssh/
 
+PUBLIC_KEY_VALUE=$(cat ./kubernetes.ed25519.pub | tr -d '\n')
+
 # now we copy in the public key into all the machines
 for playground_id in $(labctl playground list -q); do
   for machine_name in $(labctl playground machines $playground_id | sed '1d'); do
@@ -20,10 +22,8 @@ for playground_id in $(labctl playground list -q); do
       labctl cp ./kubernetes.ed25519.pub $playground_id:~/.ssh/ --machine $machine_name
     else
       echo "adding the jumpbox ssh key to the authorized_keys for $machine_name"
-      labctl ssh $playground_id --machine $machine_name -- "chmod 600 ~/.ssh/authorized_keys"
-      labctl ssh $playground_id --machine $machine_name -- "printf \"\n\" >> ~/.ssh/authorized_keys"
-      cat ./kubernetes.ed25519.pub | labctl ssh $playground_id --machine $machine_name -- "cat >> ~/.ssh/authorized_keys"
-      labctl ssh $playground_id --machine $machine_name -- "chmod 400 ~/.ssh/authorized_keys"
+      SCRIPT=$(sed "s|PUBLIC_KEY_VALUE|$(echo "$PUBLIC_KEY_VALUE" | sed 's/[&/\]/\\&/g')|" scripts/update_authorized_keys.sh)
+      echo "$SCRIPT" | labctl ssh $playground_id --machine $machine_name
     fi
   done
 done
