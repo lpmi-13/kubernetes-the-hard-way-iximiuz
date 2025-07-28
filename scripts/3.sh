@@ -2,6 +2,9 @@ JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.ma
 
 labctl cp ./downloads.txt $JUMPBOX_PLAYGROUND_ID:~/downloads.txt
 
+# this is for convenience so we can skip the host key checking
+labctl cp ./scripts/jumpbox_ssh_config $JUMPBOX_PLAYGROUND_ID:~/.ssh/config
+
 cat scripts/setup_jumpbox.sh | labctl ssh $JUMPBOX_PLAYGROUND_ID
 
 rm kubernetes.ed25519*
