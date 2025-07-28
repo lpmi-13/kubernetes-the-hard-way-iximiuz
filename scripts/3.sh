@@ -27,3 +27,9 @@ for playground_id in $(labctl playground list -q); do
     fi
   done
 done
+
+# NB: WE ACTUALLY NEED TO WAIT TIL THE API SERVER IS RUNNING ON THE CONTROLLER NODES, SO DO THIS LATER
+# install HAProxy on the load balancer machine in the controller cluster
+# LOADBALANCER_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | .[].name == "load-balancer") | .id')
+#
+# cat scripts/install_haproxy.sh | labctl ssh $LOADBALANCER_PLAYGROUND_ID --machine "load-balancer"

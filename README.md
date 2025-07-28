@@ -34,6 +34,7 @@ Because we're interacting with the VMs slightly differently from a regular cloud
 
 - jumpbox
 - controller-{1..3}
+- load-balancer (this will be in the same subnet as the controller instances)
 - worker-{1..3}
 - worker-{4..6}
 - worker-{7..9}

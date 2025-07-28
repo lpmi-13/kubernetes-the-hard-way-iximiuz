@@ -137,7 +137,24 @@ labctl playground start flexbox -f -<<EOF
             resources:
               cpuCount: 2
               ramSize: 1.5GiB
+
           - name: controller-3
+            users:
+              - name: root
+              - name: laborant
+                default: true
+            drives:
+              - source: ubuntu-24-04
+                mount: /
+                size: 30GiB
+            network:
+              interfaces:
+                  - network: local
+            resources:
+              cpuCount: 2
+              ramSize: 1.5GiB
+
+          - name: load-balancer
             users:
               - name: root
               - name: laborant
@@ -165,6 +182,10 @@ labctl playground start flexbox -f -<<EOF
             kind: terminal
             name: controller-3
             machine: controller-3
+          - id: terminal-load-balancer
+            kind: terminal
+            name: load-balancer
+            machine: load-balancer
       accessControl:
           canList:
               - anyone
