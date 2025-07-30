@@ -5,7 +5,9 @@ labctl cp ./downloads.txt $JUMPBOX_PLAYGROUND_ID:~/downloads.txt
 # this is for convenience so we can skip the host key checking
 labctl cp ./scripts/jumpbox_ssh_config $JUMPBOX_PLAYGROUND_ID:~/.ssh/config
 
+# we'll need both of these configuration file directories later
 labctl cp -r ./configs $JUMPBOX_PLAYGROUND_ID:~/configs
+labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
 
 cat scripts/setup_jumpbox.sh | labctl ssh $JUMPBOX_PLAYGROUND_ID
 

@@ -16,6 +16,13 @@ and then we need to copy over the file with the installation URLs.
 labctl cp ./downloads.txt $JUMPBOX_PLAYGROUND_ID:~/downloads.txt
 ```
 
+We also want to copy over some of the configuration file directories to the jumpbox
+
+```sh
+labclt cp -r ./configs $JUMPBOX_PLAYGROUND_ID:~/configs
+labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
+```
+
 and now we're ready to jump on there and install some tools.
 
 ```sh
