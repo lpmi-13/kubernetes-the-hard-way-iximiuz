@@ -54,9 +54,8 @@ Generate the certificates and private keys:
 certs=(
   "admin" "node-1" "node-2"
   "node-3" "node-4" "node-5"
-  "node-6" "node-6" "node-7"
-  "node-8" "node-9"
-  "kube-proxy" "kube-scheduler"
+  "node-6" "node-7" "node-8"
+  "node-9" "kube-proxy" "kube-scheduler"
   # we might need to do separate controller certs later
   "kube-controller-manager"
   "kube-api-server"
@@ -91,19 +90,19 @@ ls -1 *.crt *.key *.csr
 
 In this section you will copy the various certificates to every machine at a path where each Kubernetes component will search for its certificate pair. In a real-world environment these certificates should be treated like a set of sensitive secrets as they are used as credentials by the Kubernetes components to authenticate to each other.
 
-Copy the appropriate certificates and private keys to the `node-0` and `node-1` machines:
+Copy the appropriate certificates and private keys to the `worker-*` machines:
 
 ```sh
 for host in worker-{1..9}; do
-  ssh -i ~/.ssh/kubernetes.ed25519 laborant@${host} sudo mkdir /var/lib/kubelet/
+  ssh -i ~/.ssh/kubernetes.ed25519 laborant@${host} mkdir /var/lib/kubelet/
 
   scp -i ~/.ssh/kubernetes.ed25519 ca.crt laborant@${host}:/var/lib/kubelet/
 
   scp -i ~/.ssh/kubernetes.ed25519 ${host}.crt \
-    laborant@${host}:/var/lib/kubelet/kubelet.crt
+    root@${host}:/var/lib/kubelet/kubelet.crt
 
   scp -i ~/.ssh/kubernetes.ed25519 ${host}.key \
-    laborant@${host}:/var/lib/kubelet/kubelet.key
+    root@${host}:/var/lib/kubelet/kubelet.key
 done
 ```
 
@@ -115,7 +114,7 @@ for host in controller-{1..3}; do
     ca.key ca.crt \
     kube-api-server.key kube-api-server.crt \
     service-accounts.key service-accounts.crt \
-    laborant@${host}:~/
+    root@${host}:~/
 done
 ```
 
