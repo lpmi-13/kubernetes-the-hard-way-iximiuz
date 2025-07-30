@@ -10,7 +10,7 @@ cat scripts/setup_jumpbox.sh | labctl ssh $JUMPBOX_PLAYGROUND_ID
 rm kubernetes.ed25519*
 
 # we also need to distribute ssh keys so that we can copy stuff from the jumpbox to the other nodes
-ssh-keygen -t ed25519 -C "laborant@jumpbox" -o -a 100 -f kubernetes.ed25519 -N ""
+ssh-keygen -t ed25519 -C "root@jumpbox" -o -a 100 -f kubernetes.ed25519 -N ""
 
 labctl cp ./kubernetes.ed25519 $JUMPBOX_PLAYGROUND_ID:~/.ssh/
 

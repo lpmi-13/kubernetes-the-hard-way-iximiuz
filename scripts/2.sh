@@ -26,7 +26,6 @@ for i in {1..3}; do
             - name: worker-${start_worker}
               users:
                 - name: root
-                - name: laborant
                   default: true
               drives:
                 - source: ubuntu-24-04
@@ -41,7 +40,6 @@ for i in {1..3}; do
             - name: worker-$((start_worker+1))
               users:
                 - name: root
-                - name: laborant
                   default: true
               drives:
                 - source: ubuntu-24-04
@@ -56,7 +54,6 @@ for i in {1..3}; do
             - name: worker-${end_worker}
               users:
                 - name: root
-                - name: laborant
                   default: true
               drives:
                 - source: ubuntu-24-04
@@ -110,7 +107,6 @@ labctl playground start flexbox -f -<<EOF
           - name: controller-1
             users:
               - name: root
-              - name: laborant
                 default: true
             drives:
               - source: ubuntu-24-04
@@ -125,7 +121,6 @@ labctl playground start flexbox -f -<<EOF
           - name: controller-2
             users:
               - name: root
-              - name: laborant
                 default: true
             drives:
               - source: ubuntu-24-04
@@ -141,7 +136,6 @@ labctl playground start flexbox -f -<<EOF
           - name: controller-3
             users:
               - name: root
-              - name: laborant
                 default: true
             drives:
               - source: ubuntu-24-04
@@ -157,7 +151,6 @@ labctl playground start flexbox -f -<<EOF
           - name: load-balancer
             users:
               - name: root
-              - name: laborant
                 default: true
             drives:
               - source: ubuntu-24-04
@@ -212,7 +205,6 @@ labctl playground start flexbox -f -<<EOF
           - name: jumpbox
             users:
               - name: root
-              - name: laborant
                 default: true
             drives:
               - source: ubuntu-24-04
@@ -244,5 +236,6 @@ for playground_id in $(labctl playground list -q); do
   for machine_name in $(labctl playground machines $playground_id | sed '1d'); do
     SCRIPT=$(sed "s/TAILSCALE_AUTH_KEY_PLACEHOLDER/${TAILSCALE_AUTH_KEY//\"/\\\"}/" scripts/install_tailscale.sh)
     echo "$SCRIPT" | labctl ssh $playground_id --machine $machine_name
+    sleep 3
   done
 done

@@ -93,28 +93,30 @@ In this section you will copy the various certificates to every machine at a pat
 
 Copy the appropriate certificates and private keys to the `node-0` and `node-1` machines:
 
-```bash
-for host in node-0 node-1; do
-  ssh root@${host} mkdir /var/lib/kubelet/
+```sh
+for host in worker-{1..9}; do
+  ssh -i ~/.ssh/kubernetes.ed25519 laborant@${host} sudo mkdir /var/lib/kubelet/
 
-  scp ca.crt root@${host}:/var/lib/kubelet/
+  scp -i ~/.ssh/kubernetes.ed25519 ca.crt laborant@${host}:/var/lib/kubelet/
 
-  scp ${host}.crt \
-    root@${host}:/var/lib/kubelet/kubelet.crt
+  scp -i ~/.ssh/kubernetes.ed25519 ${host}.crt \
+    laborant@${host}:/var/lib/kubelet/kubelet.crt
 
-  scp ${host}.key \
-    root@${host}:/var/lib/kubelet/kubelet.key
+  scp -i ~/.ssh/kubernetes.ed25519 ${host}.key \
+    laborant@${host}:/var/lib/kubelet/kubelet.key
 done
 ```
 
-Copy the appropriate certificates and private keys to the `server` machine:
+Copy the appropriate certificates and private keys to the `controller-{1..3}` machines:
 
-```bash
-scp \
-  ca.key ca.crt \
-  kube-api-server.key kube-api-server.crt \
-  service-accounts.key service-accounts.crt \
-  root@server:~/
+```sh
+for host in controller-{1..3}; do
+  scp -i ~/.ssh/kubernetes.25519 \
+    ca.key ca.crt \
+    kube-api-server.key kube-api-server.crt \
+    service-accounts.key service-accounts.crt \
+    laborant@${host}:~/
+done
 ```
 
 > The `kube-proxy`, `kube-controller-manager`, `kube-scheduler`, and `kubelet` client certificates will be used to generate client authentication configuration files in the next lab.
