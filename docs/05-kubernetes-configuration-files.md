@@ -208,10 +208,12 @@ done
 Copy the `kube-controller-manager` and `kube-scheduler` kubeconfig files to the `server` machine:
 
 ```bash
-scp -i ~/.ssh/kubernetes.ed25519 admin.kubeconfig \
-  kube-controller-manager.kubeconfig \
-  kube-scheduler.kubeconfig \
-  root@server:~/
+for host in controller-{1..3}; do
+  scp -i ~/.ssh/kubernetes.ed25519 admin.kubeconfig \
+    kube-controller-manager.kubeconfig \
+    kube-scheduler.kubeconfig \
+    root@${host}:~/
+done
 ```
 
 Next: [Generating the Data Encryption Config and Key](06-data-encryption-keys.md)

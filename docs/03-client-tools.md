@@ -97,7 +97,7 @@ Kustomize Version: v5.5.0
 Let's generate an ssh key locally and then distribute it across all the VMs. Unfortunately, because we can currently only access every machine using labctl, we'll use that to get all the ssh keys to the nodes. After that, we can access all the VMs by hostname (because of tailscale magic) using ssh.
 
 ```sh
-ssh-keygen -t ed25519 -C "laborant@jumpbox" -o -a 100 -f kubernetes.ed25519 -N ""
+ssh-keygen -t ed25519 -C "root@jumpbox" -o -a 100 -f kubernetes.ed25519 -N ""
 ```
 
 We put the private key we just created onto the jumpbox
