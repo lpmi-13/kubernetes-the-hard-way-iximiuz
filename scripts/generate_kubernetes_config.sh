@@ -12,7 +12,7 @@ for host in worker-{1..9}; do
     --kubeconfig=${host}.kubeconfig
 
   kubectl config set-context default \
-    --cluster=kubernetes-the-hard-way \
+    --cluster=kubernetes-the-iximiuz-way \
     --user=system:node:${host} \
     --kubeconfig=${host}.kubeconfig
 
@@ -34,7 +34,7 @@ kubectl config set-credentials system:kube-proxy \
   --kubeconfig=kube-proxy.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-hard-way \
+  --cluster=kubernetes-the-iximiuz-way \
   --user=system:kube-proxy \
   --kubeconfig=kube-proxy.kubeconfig
 
@@ -54,7 +54,7 @@ kubectl config set-credentials system:kube-controller-manager \
   --kubeconfig=kube-controller-manager.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-hard-way \
+  --cluster=kubernetes-the-iximiuz-way \
   --user=system:kube-controller-manager \
   --kubeconfig=kube-controller-manager.kubeconfig
 
@@ -74,7 +74,7 @@ kubectl config set-credentials system:kube-scheduler \
   --kubeconfig=kube-scheduler.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-hard-way \
+  --cluster=kubernetes-the-iximiuz-way \
   --user=system:kube-scheduler \
   --kubeconfig=kube-scheduler.kubeconfig
 
@@ -94,7 +94,7 @@ kubectl config set-credentials admin \
   --kubeconfig=admin.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-hard-way \
+  --cluster=kubernetes-the-iximiuz-way \
   --user=admin \
   --kubeconfig=admin.kubeconfig
 
