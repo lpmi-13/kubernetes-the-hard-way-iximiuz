@@ -8,15 +8,17 @@ labctl cp ./scripts/jumpbox_ssh_config $JUMPBOX_PLAYGROUND_ID:~/.ssh/config
 # we'll need both of these configuration file directories later
 labctl cp -r ./configs $JUMPBOX_PLAYGROUND_ID:~/configs
 
+CONTROLLER_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | .[0].name == "controller-1") | .id')
+
 # we also need to get the tailnet IP addresses for each of the controllers, since those need to be passed into each of the etcd
 # config files. etcd can only resolve IP addresses for some of the flags, so we need these available.
-CONTROLLER_1_IP=$(labctl ssh $CONTROLLER_PLAYGROUND_ID --machine controller-1 "tailscale ip -4")
-CONTROLLER_2_IP=$(labctl ssh $CONTROLLER_PLAYGROUND_ID --machine controller-2 "tailscale ip -4")
-CONTROLLER_3_IP=$(labctl ssh $CONTROLLER_PLAYGROUND_ID --machine controller-3 "tailscale ip -4")
+CONTROLLER_1_IP=$(labctl ssh $CONTROLLER_PLAYGROUND_ID --machine controller-1 "tailscale ip -4" | tr -d '\n\r')
+CONTROLLER_2_IP=$(labctl ssh $CONTROLLER_PLAYGROUND_ID --machine controller-2 "tailscale ip -4" | tr -d '\n\r')
+CONTROLLER_3_IP=$(labctl ssh $CONTROLLER_PLAYGROUND_ID --machine controller-3 "tailscale ip -4" | tr -d '\n\r')
 
-sed -i "s/CONTROLLER_1_IP/$CONTROLLER_1_IP/g" ./units/etcd.service
-sed -i "s/CONTROLLER_2_IP/$CONTROLLER_2_IP/g" ./units/etcd.service
-sed -i "s/CONTROLLER_3_IP/$CONTROLLER_3_IP/g" ./units/etcd.service
+sed -i "s|CONTROLLER_1_IP|${CONTROLLER_1_IP}|g" ./units/etcd.service
+sed -i "s|CONTROLLER_2_IP|${CONTROLLER_2_IP}|g" ./units/etcd.service
+sed -i "s|CONTROLLER_3_IP|${CONTROLLER_3_IP}|g" ./units/etcd.service
 
 labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
 
