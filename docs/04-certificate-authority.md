@@ -52,10 +52,10 @@ Generate the certificates and private keys:
 
 ```sh
 certs=(
-  "admin" "node-1" "node-2"
-  "node-3" "node-4" "node-5"
-  "node-6" "node-7" "node-8"
-  "node-9" "kube-proxy" "kube-scheduler"
+  "admin" "worker-1" "worker-2"
+  "worker-3" "worker-4" "worker-5"
+  "worker-6" "worker-7" "worker-8"
+  "worker-9" "kube-proxy" "kube-scheduler"
   # we might need to do separate controller certs later
   "kube-controller-manager"
   "kube-api-server"
