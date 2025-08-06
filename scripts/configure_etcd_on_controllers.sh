@@ -14,4 +14,4 @@ systemctl daemon-reload
 systemctl enable etcd
 systemctl start etcd
 
-etcdctl member list
+ETCDCTL_API=3 etcdctl member list
