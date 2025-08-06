@@ -16,6 +16,8 @@ ExecStart=/usr/local/bin/etcd \
   --data-dir=/var/lib/etcd
 Restart=on-failure
 RestartSec=5
+#  we're setting this much lower to make it faster to configure the cluster initially
+TimeoutStartSec=5s
 
 [Install]
 WantedBy=multi-user.target

@@ -10,7 +10,7 @@ for machine_name in $(labctl playground machines $CONTROLLER_PLAYGROUND_ID | sed
   if [[ $machine_name == "load-balancer" ]]; then
     echo "skipping etcd configuration on load-balancer"
   else
-  labctl cp ./scripts/configure_etcd_on_controllers.sh $CONTROLLER_PLAYGROUND_ID:~/configure_etcd_on_controllers.sh --machine $machine_name
-  labctl ssh $CONTROLLER_PLAYGROUND_ID --machine $machine_name "bash ~/configure_etcd_on_controllers.sh"
+    labctl cp ./scripts/configure_etcd_on_controllers.sh $CONTROLLER_PLAYGROUND_ID:~/configure_etcd_on_controllers.sh --machine $machine_name
+    labctl ssh $CONTROLLER_PLAYGROUND_ID --machine $machine_name "bash ~/configure_etcd_on_controllers.sh"
   fi
 done
