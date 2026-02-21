@@ -70,7 +70,7 @@ fi
 
 require_cmd labctl
 require_cmd go
-require_cmd sed
+require_cmd jq
 
 : "${TS_API_CLIENT_ID:?TS_API_CLIENT_ID must be set}"
 : "${TS_API_CLIENT_SECRET:?TS_API_CLIENT_SECRET must be set}"
@@ -97,17 +97,18 @@ generate_auth_key() {
 declare -a TARGET_PLAYGROUNDS=()
 declare -a TARGET_MACHINES=()
 
-while IFS= read -r playground_id; do
+while IFS=$'\t' read -r playground_id machine_name; do
   [ -z "$playground_id" ] && continue
-  while IFS= read -r machine_name; do
-    [ -z "$machine_name" ] && continue
-    if [ -n "$ONLY_PATTERN" ] && [[ ! "$machine_name" == $ONLY_PATTERN ]]; then
-      continue
-    fi
-    TARGET_PLAYGROUNDS+=("$playground_id")
-    TARGET_MACHINES+=("$machine_name")
-  done < <(labctl playground machines "$playground_id" | sed '1d')
-done < <(labctl playground list -q)
+  [ -z "$machine_name" ] && continue
+  if [ -n "$ONLY_PATTERN" ] && [[ ! "$machine_name" == $ONLY_PATTERN ]]; then
+    continue
+  fi
+  TARGET_PLAYGROUNDS+=("$playground_id")
+  TARGET_MACHINES+=("$machine_name")
+done < <(
+  labctl playground list -o json \
+    | jq -r '.[] | select(.status.stateEvents[-1].state == "RUNNING") | .id as $id | .machines[].name | [$id, .] | @tsv'
+)
 
 if [ "${#TARGET_MACHINES[@]}" -eq 0 ]; then
   echo "No machines matched."
