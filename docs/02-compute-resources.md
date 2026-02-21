@@ -227,33 +227,64 @@ EOF
 
 ## Installing tailscale
 
-We're going to need tailscale so these nodes can see each other by the magic of tailscale DNS resolution.
+The way the nodes are going to actually communicate with each other is through the magic of tailscale DNS. Even though they _look_ like they're in the same larger subnet (172.16.0.0/16), since they're all on separate iximiuz Labs "clusters", they won't be able to contact each other by default (which is good, and by design). But though the awesome overlay network, we'll get them chatting!
 
-First, go to your [admin settings](https://login.tailscale.com/admin/settings/keys) and generate an ephemeral reusable key, and set the expiry to 1 day.
+We're going to use OAuth to mint a fresh one-off auth key for each machine at provisioning time. That keeps keys single-use and avoids storing a reusable auth key in `.env`.
 
-![tailscale ephemeral key generation](/images/tailscale-keys.png)
+### One-time Tailscale OAuth bootstrap
 
-Now you can put that in a local `.env` file for use in your environment vars.
+1. In the Tailscale admin console, create the tag you'll use for lab machines (for example, `tag:kthw`).
+2. Create an OAuth client for this tailnet with `auth_keys` write access.
+3. Allow that OAuth client to create auth keys with your chosen tag (for example, `tag:kthw`).
+4. Save the OAuth client ID and secret.
+
+See the official reference for OAuth clients: <https://tailscale.com/docs/features/oauth-clients>.
+
+### Configure local environment
 
 ```sh
 cp .env.example .env
 ```
 
-and add in the value for the auth key.
+Set the values in `.env`:
 
-now we can add it to our env like so:
+- `TS_API_CLIENT_ID`
+- `TS_API_CLIENT_SECRET`
+- `TS_TAGS` (defaults to `tag:kthw`)
+
+Load the env vars:
 
 ```sh
 source .env
 ```
 
-now you're ready to install tailscale on each of the workers, controllers, and jumpbox
+### Install and enroll all machines
+
+This runs locally, generates one-off keys via OAuth, and joins each VM to the tailnet.
+
+```sh
+bash scripts/provision_tailscale_oauth_oneoff.sh
+```
+
+Useful options:
+
+```sh
+# Show what would be enrolled without making changes
+bash scripts/provision_tailscale_oauth_oneoff.sh --dry-run
+
+# Enroll only a subset of machines
+bash scripts/provision_tailscale_oauth_oneoff.sh --only 'worker-*'
+```
+
+### Verify
+
+Check that Tailscale is up on every node:
 
 ```sh
 for playground_id in $(labctl playground list -q); do
-  for machine_name in $(labctl playground machines $playground_id | sed '1d'); do
-    SCRIPT=$(sed "s/TAILSCALE_AUTH_KEY_PLACEHOLDER/${TAILSCALE_AUTH_KEY//\"/\\\"}/" install_tailscale.sh)
-    echo "$SCRIPT" | labctl ssh $playground_id --machine $machine_name
+  for machine_name in $(labctl playground machines "$playground_id" | sed '1d'); do
+    echo "=== $machine_name ==="
+    labctl ssh "$playground_id" --machine "$machine_name" tailscale status --json >/dev/null && echo ok
   done
 done
 ```

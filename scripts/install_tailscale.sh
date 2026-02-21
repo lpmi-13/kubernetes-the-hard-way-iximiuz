@@ -1,8 +1,32 @@
-curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | sudo apt-key add -
-curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | sudo tee /etc/apt/sources.list.d/tailscale.list
-sudo apt-get update
-sudo apt-get install -y tailscale
-sudo systemctl start tailscaled
+#!/usr/bin/env sh
+set -eu
 
-# this gets overriden when we actually run the commands
-sudo tailscale up --authkey=TAILSCALE_AUTH_KEY_PLACEHOLDER
+if [ -z "${TAILSCALE_AUTH_KEY:-}" ]; then
+  echo "TAILSCALE_AUTH_KEY must be set"
+  exit 1
+fi
+
+if [ -z "${TAILSCALE_HOSTNAME:-}" ]; then
+  TAILSCALE_HOSTNAME="$(hostname)"
+fi
+
+if [ -z "${TAILSCALE_TAGS:-}" ]; then
+  TAILSCALE_TAGS="tag:kthw"
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
+if ! command -v tailscale >/dev/null 2>&1; then
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+
+$SUDO systemctl enable --now tailscaled
+$SUDO tailscale up \
+  --auth-key="$TAILSCALE_AUTH_KEY" \
+  --hostname="$TAILSCALE_HOSTNAME" \
+  --advertise-tags="$TAILSCALE_TAGS"
+$SUDO tailscale status >/dev/null
