@@ -41,7 +41,7 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 1.5GiB
+                ramSize: 4GiB
             - name: worker-$((start_worker+1))
               users:
                 - name: root
@@ -56,7 +56,7 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 1.5GiB
+                ramSize: 4GiB
             - name: worker-${end_worker}
               users:
                 - name: root
@@ -71,7 +71,7 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 1.5GiB
+                ramSize: 4GiB
         tabs:
             - id: terminal-worker-${start_worker}
               kind: terminal
@@ -125,7 +125,7 @@ labctl playground start flexbox -f -<<EOF
                   - network: local
             resources:
               cpuCount: 2
-              ramSize: 1.5GiB
+              ramSize: 4GiB
           - name: controller-2
             users:
               - name: root
@@ -140,7 +140,7 @@ labctl playground start flexbox -f -<<EOF
                   - network: local
             resources:
               cpuCount: 2
-              ramSize: 1.5GiB
+              ramSize: 4GiB
           - name: controller-3
             users:
               - name: root
@@ -155,7 +155,7 @@ labctl playground start flexbox -f -<<EOF
                   - network: local
             resources:
               cpuCount: 2
-              ramSize: 1.5GiB
+              ramSize: 4GiB
       tabs:
           - id: terminal-controller-1
             kind: terminal
@@ -209,7 +209,7 @@ labctl playground start flexbox -f -<<EOF
                   - network: local
             resources:
               cpuCount: 2
-              ramSize: 1.5GiB
+              ramSize: 4GiB
       tabs:
           - id: terminal-jumpbox
             kind: terminal
