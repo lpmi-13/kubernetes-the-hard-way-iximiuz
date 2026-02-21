@@ -234,7 +234,7 @@ We're going to use OAuth to mint a fresh one-off auth key for each machine at pr
 ### One-time Tailscale OAuth bootstrap
 
 1. In the Tailscale admin console, create the tag you'll use for lab machines (for example, `tag:kthw`).
-2. Create an OAuth client for this tailnet with `auth_keys` write access.
+2. Create an OAuth client for this tailnet with `auth_keys` and `devices:core` access.
 3. Allow that OAuth client to create auth keys with your chosen tag (for example, `tag:kthw`).
 4. Save the OAuth client ID and secret.
 
@@ -287,4 +287,22 @@ for playground_id in $(labctl playground list -q); do
     labctl ssh "$playground_id" --machine "$machine_name" tailscale status --json >/dev/null && echo ok
   done
 done
+```
+
+### Cleanup
+
+Use the repo cleanup script when you want to tear down lab resources. It now removes stale, offline Tailscale devices that match current lab machine names and tag before destroying playgrounds.
+
+```sh
+bash clean-up.sh
+```
+
+Useful options:
+
+```sh
+# Preview tailscale/playground/file cleanup actions
+bash clean-up.sh --dry-run
+
+# Destroy playgrounds and local keys, but skip tailscale API cleanup
+bash clean-up.sh --no-tailscale
 ```

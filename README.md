@@ -59,4 +59,4 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 12) We run some smoke tests like data encryption and port-forwarding an nginx service.
 
-13) We cleanup by just terminating all playgrounds...hashtag delicious!
+13) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds...hashtag delicious
