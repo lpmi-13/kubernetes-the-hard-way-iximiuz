@@ -15,8 +15,8 @@ global
 
 defaults
     log global
-    mode http
-    option httplog
+    mode tcp
+    option tcplog
     option dontlognull
     timeout connect 5000
     timeout client 50000
@@ -31,9 +31,11 @@ defaults
 
 frontend kubernetes_api
     bind *:6443
+    mode tcp
     default_backend k8s_controllers
 
 backend k8s_controllers
+    mode tcp
     balance roundrobin
     server controller-1 controller-1:6443 check
     server controller-2 controller-2:6443 check
