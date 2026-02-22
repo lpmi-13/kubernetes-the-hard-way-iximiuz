@@ -49,14 +49,16 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 7) We bootstrap an etcd server (we might want to do this with an etcd cluster...not sure yet)
 
-8) We bootstrap the kubernetes control plane.
+8) We bootstrap the kubernetes control plane and configure HAProxy on the load-balancer. HAProxy is the canonical entrypoint for jumpbox traffic and future external access, distributing API requests across controller nodes.
 
 9) We bootstrap the kubernetes worker nodes.
 
-10) We configure kubectl on the jumpbox for remote access (we did this earlier I think, but let's leave it to confirm when we get to this step)
+10) We configure kubectl on the jumpbox for remote access via `server.kubernetes.local:6443` (the HAProxy endpoint).
 
-11) We'll provision the pod networking routes.
+11) We'll provision the pod networking routes across all workers.
 
-12) We run some smoke tests like data encryption and port-forwarding an nginx service.
+12) We deploy CoreDNS and verify in-cluster name resolution.
 
-13) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds...hashtag delicious
+13) We run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, and DNS resolution.
+
+14) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds.
