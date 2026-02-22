@@ -77,6 +77,8 @@ require_cmd jq
 
 TS_TAGS="${TS_TAGS:-tag:kthw}"
 TS_GO_CACHE_ROOT="${TS_GO_CACHE_ROOT:-/tmp/kthw-go}"
+TS_ENROLL_MAX_RETRIES=3
+TS_ENROLL_RETRY_DELAY_SEC=5
 mkdir -p "$TS_GO_CACHE_ROOT/gopath/pkg/mod" "$TS_GO_CACHE_ROOT/gocache"
 
 generate_auth_key() {
@@ -131,25 +133,42 @@ for i in "${!TARGET_MACHINES[@]}"; do
     continue
   fi
 
-  if ! auth_key="$(generate_auth_key)"; then
-    echo "  error: failed to generate OAuth one-off key"
-    FAILURES=$((FAILURES + 1))
-    continue
-  fi
+  enrolled=false
+  for attempt in $(seq 1 "$TS_ENROLL_MAX_RETRIES"); do
+    echo "  attempt ${attempt}/${TS_ENROLL_MAX_RETRIES}"
 
-  auth_key_escaped="$(printf '%q' "$auth_key")"
-  machine_name_escaped="$(printf '%q' "$machine_name")"
-  ts_tags_escaped="$(printf '%q' "$TS_TAGS")"
+    if ! auth_key="$(generate_auth_key)"; then
+      echo "  error: failed to generate OAuth one-off key"
+      if [ "$attempt" -lt "$TS_ENROLL_MAX_RETRIES" ]; then
+        sleep "$TS_ENROLL_RETRY_DELAY_SEC"
+      fi
+      continue
+    fi
 
-  if {
-    printf 'export TAILSCALE_AUTH_KEY=%s\n' "$auth_key_escaped"
-    printf 'export TAILSCALE_HOSTNAME=%s\n' "$machine_name_escaped"
-    printf 'export TAILSCALE_TAGS=%s\n' "$ts_tags_escaped"
-    cat "$INSTALL_SCRIPT"
-  } | labctl ssh "$playground_id" --machine "$machine_name"; then
+    auth_key_escaped="$(printf '%q' "$auth_key")"
+    machine_name_escaped="$(printf '%q' "$machine_name")"
+    ts_tags_escaped="$(printf '%q' "$TS_TAGS")"
+
+    if {
+      printf 'export TAILSCALE_AUTH_KEY=%s\n' "$auth_key_escaped"
+      printf 'export TAILSCALE_HOSTNAME=%s\n' "$machine_name_escaped"
+      printf 'export TAILSCALE_TAGS=%s\n' "$ts_tags_escaped"
+      cat "$INSTALL_SCRIPT"
+    } | labctl ssh "$playground_id" --machine "$machine_name"; then
+      enrolled=true
+      break
+    fi
+
+    if [ "$attempt" -lt "$TS_ENROLL_MAX_RETRIES" ]; then
+      echo "  warning: enroll failed, retrying in ${TS_ENROLL_RETRY_DELAY_SEC}s"
+      sleep "$TS_ENROLL_RETRY_DELAY_SEC"
+    fi
+  done
+
+  if [ "$enrolled" = true ]; then
     SUCCESS=$((SUCCESS + 1))
   else
-    echo "  error: tailscale install/enroll failed"
+    echo "  error: tailscale install/enroll failed after ${TS_ENROLL_MAX_RETRIES} attempts"
     FAILURES=$((FAILURES + 1))
   fi
 done
