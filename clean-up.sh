@@ -14,7 +14,7 @@ Usage: ./clean-up.sh [--dry-run] [--no-tailscale]
 
 Options:
   --dry-run        Print actions without deleting devices/playgrounds/files.
-  --no-tailscale   Skip Tailscale stale-device cleanup.
+  --no-tailscale   Skip Tailscale device cleanup.
   -h, --help       Show this help text.
 
 Environment:
@@ -85,7 +85,7 @@ if [ "$SKIP_TAILSCALE" = false ]; then
   : "${TS_API_CLIENT_ID:?TS_API_CLIENT_ID must be set for tailscale cleanup}"
   : "${TS_API_CLIENT_SECRET:?TS_API_CLIENT_SECRET must be set for tailscale cleanup}"
 
-  echo "Tailscale cleanup: discovering stale devices..."
+  echo "Tailscale cleanup: discovering matching devices..."
 
   oauth_resp="$(curl -sS -u "${TS_API_CLIENT_ID}:${TS_API_CLIENT_SECRET}" -d grant_type=client_credentials https://api.tailscale.com/api/v2/oauth/token)"
   access_token="$(echo "$oauth_resp" | jq -er '.access_token')"
@@ -116,7 +116,7 @@ if [ "$SKIP_TAILSCALE" = false ]; then
       target_hosts["$machine_name"]=1
     done
   else
-    echo "No lab machines found; falling back to tag-based stale cleanup."
+    echo "No lab machines found; falling back to tag-based cleanup."
   fi
 
   declare -A required_tags=()
@@ -135,13 +135,20 @@ if [ "$SKIP_TAILSCALE" = false ]; then
 
     if [ "$restrict_to_target_hosts" = true ]; then
       short_name="${device_name%%.*}"
-      if [ -z "${target_hosts[$short_name]:-}" ]; then
+      match_host=false
+      if [ -n "${target_hosts[$short_name]:-}" ]; then
+        match_host=true
+      else
+        for host in "${!target_hosts[@]}"; do
+          if [[ "$short_name" == "${host}"-* ]]; then
+            match_host=true
+            break
+          fi
+        done
+      fi
+      if [ "$match_host" = false ]; then
         continue
       fi
-    fi
-
-    if [ "$online" = "true" ]; then
-      continue
     fi
 
     tag_match=false
@@ -162,7 +169,7 @@ if [ "$SKIP_TAILSCALE" = false ]; then
 
   stale_total="${#stale_device_ids[@]}"
   if [ "$stale_total" -eq 0 ]; then
-    echo "Tailscale cleanup summary: 0 stale devices matched."
+    echo "Tailscale cleanup summary: 0 devices matched."
   else
     echo "Tailscale cleanup candidates: $stale_total"
   fi
@@ -221,7 +228,6 @@ else
     if [ "$DRY_RUN" = true ]; then
       echo "dry-run: would destroy playground $playground_id"
     else
-      echo "Destroying playground $playground_id"
       labctl playground destroy "$playground_id"
     fi
   done
