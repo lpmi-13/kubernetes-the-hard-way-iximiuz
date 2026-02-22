@@ -1,3 +1,5 @@
+set -euo pipefail
+
 for host in worker-{1..9}; do
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.crt \
@@ -12,7 +14,7 @@ for host in worker-{1..9}; do
     --kubeconfig=${host}.kubeconfig
 
   kubectl config set-context default \
-    --cluster=kubernetes-the-iximiuz-way \
+    --cluster=kubernetes-the-hard-way \
     --user=system:node:${host} \
     --kubeconfig=${host}.kubeconfig
 
@@ -34,7 +36,7 @@ kubectl config set-credentials system:kube-proxy \
   --kubeconfig=kube-proxy.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-iximiuz-way \
+  --cluster=kubernetes-the-hard-way \
   --user=system:kube-proxy \
   --kubeconfig=kube-proxy.kubeconfig
 
@@ -54,7 +56,7 @@ kubectl config set-credentials system:kube-controller-manager \
   --kubeconfig=kube-controller-manager.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-iximiuz-way \
+  --cluster=kubernetes-the-hard-way \
   --user=system:kube-controller-manager \
   --kubeconfig=kube-controller-manager.kubeconfig
 
@@ -74,7 +76,7 @@ kubectl config set-credentials system:kube-scheduler \
   --kubeconfig=kube-scheduler.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-iximiuz-way \
+  --cluster=kubernetes-the-hard-way \
   --user=system:kube-scheduler \
   --kubeconfig=kube-scheduler.kubeconfig
 
@@ -94,7 +96,7 @@ kubectl config set-credentials admin \
   --kubeconfig=admin.kubeconfig
 
 kubectl config set-context default \
-  --cluster=kubernetes-the-iximiuz-way \
+  --cluster=kubernetes-the-hard-way \
   --user=admin \
   --kubeconfig=admin.kubeconfig
 
@@ -105,7 +107,7 @@ for host in worker-{1..9}; do
   ssh -i ~/.ssh/kubernetes.ed25519 root@${host} "mkdir -p /var/lib/{kube-proxy,kubelet}"
 
   scp -i ~/.ssh/kubernetes.ed25519 kube-proxy.kubeconfig \
-    root@${host}:/var/lib/kube-proxy/kubeconfig \
+    root@${host}:/var/lib/kube-proxy/kubeconfig
 
   scp -i ~/.ssh/kubernetes.ed25519 ${host}.kubeconfig \
     root@${host}:/var/lib/kubelet/kubeconfig
