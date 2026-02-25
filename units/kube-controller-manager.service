@@ -10,6 +10,7 @@ ExecStart=/usr/local/bin/kube-controller-manager \
   --cluster-signing-cert-file=/var/lib/kubernetes/ca.crt \
   --cluster-signing-key-file=/var/lib/kubernetes/ca.key \
   --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \
+  --leader-elect=true \
   --root-ca-file=/var/lib/kubernetes/ca.crt \
   --service-account-private-key-file=/var/lib/kubernetes/service-accounts.key \
   --service-cluster-ip-range=10.32.0.0/24 \

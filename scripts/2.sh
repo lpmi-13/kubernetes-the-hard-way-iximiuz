@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DOTENV_FILE="${DOTENV_FILE:-${REPO_ROOT}/.env}"
+
 # Tailscale cleanup: remove devices that match current lab machine names and tag.
-if [ -f .env ]; then
+if [ -f "$DOTENV_FILE" ]; then
   set -a
   # shellcheck disable=SC1090
-  . ./.env
+  . "$DOTENV_FILE"
   set +a
 fi
 
@@ -21,10 +24,36 @@ if [ -n "${TS_API_CLIENT_ID:-}" ] && [ -n "${TS_API_CLIENT_SECRET:-}" ]; then
   else
     echo "cleaning up tailscale devices..."
 
-    oauth_resp="$(curl -sS -u "${TS_API_CLIENT_ID}:${TS_API_CLIENT_SECRET}" -d grant_type=client_credentials https://api.tailscale.com/api/v2/oauth/token)"
-    access_token="$(echo "$oauth_resp" | jq -er '.access_token')"
+    oauth_resp_file="$(mktemp)"
+    oauth_http_code="$(
+      curl -sS -o "$oauth_resp_file" -w '%{http_code}' \
+        -u "${TS_API_CLIENT_ID}:${TS_API_CLIENT_SECRET}" \
+        -d grant_type=client_credentials \
+        https://api.tailscale.com/api/v2/oauth/token
+    )"
+    if [ "$oauth_http_code" -ne 200 ]; then
+      api_message="$(jq -r '.message // empty' "$oauth_resp_file" 2>/dev/null || true)"
+      echo "tailscale cleanup failed: unable to mint OAuth token (HTTP $oauth_http_code)." >&2
+      [ -n "$api_message" ] && echo "tailscale API message: $api_message" >&2
+      rm -f "$oauth_resp_file"
+      exit 1
+    fi
+    access_token="$(jq -er '.access_token' "$oauth_resp_file")"
+    rm -f "$oauth_resp_file"
 
-    devices_json="$(curl -sS -H "Authorization: Bearer ${access_token}" https://api.tailscale.com/api/v2/tailnet/-/devices)"
+    devices_resp_file="$(mktemp)"
+    devices_http_code="$(
+      curl -sS -o "$devices_resp_file" -w '%{http_code}' \
+        -H "Authorization: Bearer ${access_token}" \
+        https://api.tailscale.com/api/v2/tailnet/-/devices
+    )"
+    if [ "$devices_http_code" -ne 200 ]; then
+      api_message="$(jq -r '.message // empty' "$devices_resp_file" 2>/dev/null || true)"
+      echo "tailscale cleanup failed: unable to list devices (HTTP $devices_http_code)." >&2
+      [ -n "$api_message" ] && echo "tailscale API message: $api_message" >&2
+      rm -f "$devices_resp_file"
+      exit 1
+    fi
 
     machine_names="$(labctl playground list -o json | jq -r '(. // [])[]? | (.machines // [])[].name // empty')"
 
@@ -44,6 +73,9 @@ if [ -n "${TS_API_CLIENT_ID:-}" ] && [ -n "${TS_API_CLIENT_SECRET:-}" ]; then
       required_tags["$tag"]=1
     done
 
+    cleanup_candidates=0
+    cleanup_deleted=0
+    cleanup_failed=0
     while IFS=$'\t' read -r device_id device_name online tags_csv; do
       [ -z "$device_id" ] && continue
       [ -z "$device_name" ] && continue
@@ -77,10 +109,32 @@ if [ -n "${TS_API_CLIENT_ID:-}" ] && [ -n "${TS_API_CLIENT_SECRET:-}" ]; then
       done
       [ "$tag_match" = false ] && continue
 
+      cleanup_candidates=$((cleanup_candidates + 1))
       echo "deleting tailscale device ${device_name} (${device_id})"
-      curl -sS -X DELETE -H "Authorization: Bearer ${access_token}" \
-        "https://api.tailscale.com/api/v2/device/${device_id}" >/dev/null
-    done < <(echo "$devices_json" | jq -r '(.devices // [])[] | [(.id // ""), (.name // .hostname // ""), ((.online // false)|tostring), ((.tags // [])|join(","))] | @tsv')
+      delete_resp_file="$(mktemp)"
+      delete_http_code="$(
+        curl -sS -o "$delete_resp_file" -w '%{http_code}' \
+          -X DELETE \
+          -H "Authorization: Bearer ${access_token}" \
+          "https://api.tailscale.com/api/v2/device/${device_id}"
+      )"
+      if [ "$delete_http_code" -ge 200 ] && [ "$delete_http_code" -lt 300 ]; then
+        cleanup_deleted=$((cleanup_deleted + 1))
+      else
+        cleanup_failed=$((cleanup_failed + 1))
+        api_message="$(jq -r '.message // empty' "$delete_resp_file" 2>/dev/null || true)"
+        echo "failed to delete tailscale device ${device_name} (${device_id}): HTTP ${delete_http_code}" >&2
+        [ -n "$api_message" ] && echo "tailscale API message: $api_message" >&2
+      fi
+      rm -f "$delete_resp_file"
+    done < <(jq -r '(.devices // [])[] | [(.id // ""), (.name // .hostname // ""), ((.online // false)|tostring), ((.tags // [])|join(","))] | @tsv' "$devices_resp_file")
+
+    rm -f "$devices_resp_file"
+    echo "tailscale cleanup summary: ${cleanup_candidates} candidates, ${cleanup_deleted} deleted, ${cleanup_failed} failed."
+    if [ "$cleanup_failed" -gt 0 ]; then
+      echo "tailscale cleanup failed; aborting before playground rebuild." >&2
+      exit 1
+    fi
   fi
 else
   echo "tailscale cleanup skipped (TS_API_CLIENT_ID/TS_API_CLIENT_SECRET not set)"
@@ -369,11 +423,11 @@ if [ "$wait_ok" = false ]; then
   exit 1
 fi
 
-if [ ! -f .env ]; then
+if [ ! -f "$DOTENV_FILE" ]; then
   echo "missing .env; create it from .env.example before provisioning tailscale" >&2
   exit 1
 fi
 
-source .env
+. "$DOTENV_FILE"
 
-bash scripts/provision_tailscale_oauth_oneoff.sh
+bash "${REPO_ROOT}/scripts/provision_tailscale_oauth_oneoff.sh"

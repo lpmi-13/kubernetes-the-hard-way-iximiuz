@@ -10,6 +10,9 @@ authentication:
         clientCAFile: '/var/lib/kubelet/ca.crt'
 authorization:
     mode: Webhook
+clusterDomain: 'cluster.local'
+clusterDNS:
+    - '10.32.0.10'
 cgroupDriver: systemd
 containerRuntimeEndpoint: 'unix:///var/run/containerd/containerd.sock'
 enableServer: true
@@ -17,6 +20,7 @@ failSwapOn: false
 maxPods: 16
 memorySwap:
     swapBehavior: NoSwap
+podCIDR: 'POD_CIDR'
 port: 10250
 resolvConf: '/etc/resolv.conf'
 registerNode: true
