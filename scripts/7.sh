@@ -3,6 +3,7 @@ set -euo pipefail
 
 JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | length == 1 and .[0].name == "jumpbox") | .id')
 
+labctl ssh $JUMPBOX_PLAYGROUND_ID "rm -rf ~/units"
 labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
 labctl cp ./scripts/copy_etcd_config_to_controllers.sh $JUMPBOX_PLAYGROUND_ID:~/copy_etcd_config_to_controllers.sh
 

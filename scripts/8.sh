@@ -9,6 +9,7 @@ labctl cp ./scripts/install_haproxy_on_load_balancer.sh $JUMPBOX_PLAYGROUND_ID:~
 labctl cp ./scripts/update_hosts_for_api.sh $JUMPBOX_PLAYGROUND_ID:~/update_hosts_for_api.sh
 labctl cp ./scripts/update_api_host_entries.sh $JUMPBOX_PLAYGROUND_ID:~/update_api_host_entries.sh
 labctl cp ./scripts/set_up_rbac.sh $JUMPBOX_PLAYGROUND_ID:~/set_up_rbac.sh
+labctl ssh $JUMPBOX_PLAYGROUND_ID "rm -rf ~/configs ~/units"
 labctl cp -r ./configs $JUMPBOX_PLAYGROUND_ID:~/configs
 labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
 

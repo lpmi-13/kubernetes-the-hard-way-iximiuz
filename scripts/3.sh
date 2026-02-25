@@ -6,6 +6,7 @@ labctl cp ./downloads.txt $JUMPBOX_PLAYGROUND_ID:~/downloads.txt
 labctl cp ./scripts/jumpbox_ssh_config $JUMPBOX_PLAYGROUND_ID:~/.ssh/config
 
 # we'll need both of these configuration file directories later
+labctl ssh $JUMPBOX_PLAYGROUND_ID "rm -rf ~/configs ~/units"
 labctl cp -r ./configs $JUMPBOX_PLAYGROUND_ID:~/configs
 labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
 
@@ -34,4 +35,3 @@ for playground_id in $(labctl playground list -q); do
     fi
   done
 done
-
