@@ -1,6 +1,6 @@
 # Bootstrapping the Kubernetes Worker Nodes
 
-In this lab you will bootstrap nine Kubernetes worker nodes across 3 playgrounds. The following components will be installed on each node: containerd, CNI plugins, kubelet, and kube-proxy.
+In this lab you will bootstrap nine Kubernetes worker nodes across 3 playgrounds. The following components will be installed on each node: containerd and kubelet. CNI networking and service proxy functionality are handled by Cilium (deployed in step 11).
 
 ## Prerequisites
 
@@ -14,13 +14,12 @@ The commands in this lab are run from the jumpbox unless otherwise noted.
 
 ## Copy Worker Binaries to Each Node
 
-From the jumpbox, copy the worker binaries and CNI plugins to each worker:
+From the jumpbox, copy the worker binaries to each worker:
 
 ```sh
 for host in worker-{1..9}; do
   scp -i ~/.ssh/kubernetes.ed25519 -r \
     ~/downloads/worker \
-    ~/downloads/cni-plugins \
     root@${host}:~/
 done
 ```
@@ -44,61 +43,19 @@ mkdir -p \
   /opt/cni/bin \
   /etc/containerd \
   /var/lib/kubelet \
-  /var/lib/kube-proxy \
   /var/lib/kubernetes \
   /var/run/kubernetes
 ```
 
-Install the worker binaries and CNI plugins:
+Install the worker binaries:
 
 ```sh
-chmod +x ~/worker/*
-cp ~/worker/* /usr/local/bin/
-cp ~/cni-plugins/* /opt/cni/bin/
+for bin in containerd containerd-shim-runc-v2 runc kubelet; do
+  install -m 0755 ~/worker/${bin} /usr/local/bin/${bin}
+done
 ```
 
-### Configure CNI Networking
-
-Determine this worker's pod CIDR based on its hostname:
-
-```sh
-WORKER_NUMBER=$(hostname | awk -F '-' '{print $2}')
-POD_CIDR="10.200.${WORKER_NUMBER}.0/24"
-```
-
-Create the CNI bridge configuration:
-
-```sh
-cat <<EOF > /etc/cni/net.d/10-bridge.conf
-{
-  "cniVersion": "1.0.0",
-  "name": "bridge",
-  "type": "bridge",
-  "bridge": "cni0",
-  "isGateway": true,
-  "ipMasq": true,
-  "ipam": {
-    "type": "host-local",
-    "ranges": [
-      [{"subnet": "${POD_CIDR}"}]
-    ],
-    "routes": [{"dst": "0.0.0.0/0"}]
-  }
-}
-EOF
-```
-
-Create the CNI loopback configuration:
-
-```sh
-cat <<'EOF' > /etc/cni/net.d/99-loopback.conf
-{
-  "cniVersion": "1.1.0",
-  "name": "lo",
-  "type": "loopback"
-}
-EOF
-```
+> **Note**: We do not install CNI plugins (bridge, host-local, loopback) or kube-proxy here. Cilium will be deployed as a DaemonSet in step 11 and handles both CNI networking (via VXLAN overlay) and service proxy (via eBPF kube-proxy replacement).
 
 ### Configure containerd
 
@@ -156,6 +113,13 @@ Ensure the kubelet certificates and kubeconfigs are in place:
 # These files should already exist from earlier steps.
 # If not, copy them from the jumpbox.
 ls -la /var/lib/kubelet/kubelet.crt /var/lib/kubelet/kubelet.key /var/lib/kubelet/kubeconfig
+```
+
+Determine this worker's pod CIDR based on its hostname:
+
+```sh
+WORKER_NUMBER=$(hostname | awk -F '-' '{print $2}')
+POD_CIDR="10.200.${WORKER_NUMBER}.0/24"
 ```
 
 Create the kubelet configuration file:
@@ -217,55 +181,17 @@ WantedBy=multi-user.target
 EOF
 ```
 
-### Configure the Kube-Proxy
-
-Ensure the kube-proxy kubeconfig is in place:
-
-```sh
-ls -la /var/lib/kube-proxy/kubeconfig
-```
-
-Create the kube-proxy configuration file:
-
-```sh
-cat <<'EOF' > /var/lib/kube-proxy/kube-proxy-config.yaml
-kind: KubeProxyConfiguration
-apiVersion: kubeproxy.config.k8s.io/v1alpha1
-clientConnection:
-  kubeconfig: '/var/lib/kube-proxy/kubeconfig'
-mode: 'iptables'
-clusterCIDR: '10.200.0.0/16'
-EOF
-```
-
-Create the `kube-proxy.service` unit file:
-
-```sh
-cat <<'EOF' > /etc/systemd/system/kube-proxy.service
-[Unit]
-Description=Kubernetes Kube Proxy
-Documentation=https://github.com/kubernetes/kubernetes
-
-[Service]
-ExecStart=/usr/local/bin/kube-proxy \
-  --config=/var/lib/kube-proxy/kube-proxy-config.yaml
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
-
 ### Start the Worker Services
 
 ```sh
 swapoff -a
 
 systemctl daemon-reload
-systemctl enable containerd kubelet kube-proxy
-systemctl start containerd kubelet kube-proxy
+systemctl enable containerd kubelet
+systemctl start containerd kubelet
 ```
+
+> **Note**: Nodes will appear as `NotReady` until Cilium is deployed in step 11, which installs the CNI plugin.
 
 Repeat the worker setup on all nine workers.
 
@@ -277,5 +203,7 @@ From controller-1, check node status:
 ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 \
   "kubectl get nodes --kubeconfig /root/admin.kubeconfig"
 ```
+
+Nodes will show `NotReady` — this is expected. They will become `Ready` after Cilium is deployed.
 
 Next: [Configuring kubectl for Remote Access](10-configuring-kubectl.md)
