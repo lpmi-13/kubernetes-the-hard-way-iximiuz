@@ -52,40 +52,6 @@ worker-8.kubeconfig
 worker-9.kubeconfig
 ```
 
-### The kube-proxy Kubernetes Configuration File
-
-Generate a kubeconfig file for the `kube-proxy` service:
-
-```bash
-{
-  kubectl config set-cluster kubernetes-the-hard-way \
-    --certificate-authority=ca.crt \
-    --embed-certs=true \
-    --server=https://server.kubernetes.local:6443 \
-    --kubeconfig=kube-proxy.kubeconfig
-
-  kubectl config set-credentials system:kube-proxy \
-    --client-certificate=kube-proxy.crt \
-    --client-key=kube-proxy.key \
-    --embed-certs=true \
-    --kubeconfig=kube-proxy.kubeconfig
-
-  kubectl config set-context default \
-    --cluster=kubernetes-the-hard-way \
-    --user=system:kube-proxy \
-    --kubeconfig=kube-proxy.kubeconfig
-
-  kubectl config use-context default \
-    --kubeconfig=kube-proxy.kubeconfig
-}
-```
-
-Results:
-
-```text
-kube-proxy.kubeconfig
-```
-
 ### The kube-controller-manager Kubernetes Configuration File
 
 Generate a kubeconfig file for the `kube-controller-manager` service:
@@ -191,14 +157,11 @@ admin.kubeconfig
 
 ## Distribute the Kubernetes Configuration Files
 
-Copy the `kubelet` and `kube-proxy` kubeconfig files to the `worker-*` machines:
+Copy the `kubelet` kubeconfig files to the `worker-*` machines:
 
 ```bash
 for host in worker-{1..9}; do
-  ssh -i ~/.ssh/kubernetes.ed25519 root@${host} "mkdir -p /var/lib/{kube-proxy,kubelet}"
-
-  scp -i ~/.ssh/kubernetes.ed25519 kube-proxy.kubeconfig \
-    root@${host}:/var/lib/kube-proxy/kubeconfig \
+  ssh -i ~/.ssh/kubernetes.ed25519 root@${host} "mkdir -p /var/lib/kubelet"
 
   scp -i ~/.ssh/kubernetes.ed25519 ${host}.kubeconfig \
     root@${host}:/var/lib/kubelet/kubeconfig
