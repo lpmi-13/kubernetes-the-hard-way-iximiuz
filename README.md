@@ -17,7 +17,7 @@ Component versions:
 
 * [kubernetes](https://github.com/kubernetes/kubernetes) v1.32.x
 * [containerd](https://github.com/containerd/containerd) v2.1.x
-* [cni](https://github.com/containernetworking/cni) v1.6.x
+* [cilium](https://github.com/cilium/cilium) v1.16.x
 * [etcd](https://github.com/etcd-io/etcd) v3.6.x
 
 ## Action sequence
@@ -51,14 +51,14 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 8) We bootstrap the kubernetes control plane and configure HAProxy on the load-balancer. HAProxy is the canonical entrypoint for jumpbox traffic and future external access, distributing API requests across controller nodes.
 
-9) We bootstrap the kubernetes worker nodes.
+9) We bootstrap the kubernetes worker nodes (containerd + kubelet only — no CNI or kube-proxy, Cilium handles both).
 
 10) We configure kubectl on the jumpbox for remote access via `server.kubernetes.local:6443` (the HAProxy endpoint).
 
-11) We'll provision the pod networking routes across all workers.
+11) We deploy Cilium (eBPF-based CNI + kube-proxy replacement) and Hubble (network observability) across all workers. Cilium uses VXLAN overlay tunnels that traverse Tailscale's WireGuard tunnels transparently, replacing the manual pod routes and iptables-based kube-proxy.
 
 12) We deploy CoreDNS and verify in-cluster name resolution.
 
-13) We run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, and DNS resolution.
+13) We deploy the Bookinfo sample application with a traffic generator, deploy the custom network visualization tool, and run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, DNS resolution, Cilium/Hubble health, and Bookinfo connectivity.
 
 14) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds.

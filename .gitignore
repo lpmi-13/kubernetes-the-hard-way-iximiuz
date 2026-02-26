@@ -1,2 +1,4 @@
 .env
 *ed25519*
+visualization/frontend/dist/
+visualization/frontend/node_modules/
