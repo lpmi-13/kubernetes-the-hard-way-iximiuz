@@ -37,6 +37,6 @@ kubectl -n kube-system rollout status deployment/cilium-operator --timeout=300s
 
 echo "[cilium] Cilium and operator are ready"
 echo "[cilium] Hubble Relay requires CoreDNS for DNS — it will become ready after step 12"
-cilium status || true
+cilium status --wait=false || true
 
 echo "[cilium] deployment complete"
