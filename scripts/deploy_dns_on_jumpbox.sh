@@ -12,3 +12,13 @@ kubectl run busybox --image=busybox:1.28.4 --restart=Never \
 kubectl wait --for=condition=Ready pod/busybox --timeout=90s
 kubectl get pod busybox -o wide
 kubectl exec -i busybox -- nslookup kubernetes.default.svc.cluster.local
+
+# Confirm Hubble Relay is now healthy (it needs CoreDNS for DNS resolution)
+echo ""
+echo "=== Verifying Hubble Relay ==="
+kubectl -n kube-system rollout status deployment/hubble-relay --timeout=120s
+echo ""
+echo "=== Full Cilium + Hubble Status ==="
+cilium status
+echo ""
+echo "All components are healthy: Cilium, Hubble, and CoreDNS."

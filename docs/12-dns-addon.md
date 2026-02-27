@@ -243,4 +243,20 @@ Execute a DNS lookup for the Kubernetes API service FQDN:
 kubectl exec -it busybox -- nslookup kubernetes.default.svc.cluster.local
 ```
 
+## Confirm Hubble Relay
+
+Hubble Relay (deployed in step 11) requires CoreDNS to resolve the `hubble-peer` service. Now that CoreDNS is running, Relay should be healthy. Verify:
+
+```sh
+kubectl -n kube-system rollout status deployment/hubble-relay --timeout=120s
+```
+
+Run `cilium status` to confirm the full stack is green:
+
+```sh
+cilium status
+```
+
+You should see all components reporting **OK**: Cilium (9/9 agents), Operator, Envoy DaemonSet, Hubble Relay, and Hubble UI.
+
 Next: [Smoke Test](13-smoke-test.md)
