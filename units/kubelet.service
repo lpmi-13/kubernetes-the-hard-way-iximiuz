@@ -8,6 +8,7 @@ Requires=containerd.service
 ExecStart=/usr/local/bin/kubelet \
   --config=/var/lib/kubelet/kubelet-config.yaml \
   --kubeconfig=/var/lib/kubelet/kubeconfig \
+  --node-ip=NODE_IP \
   --v=2
 Restart=on-failure
 RestartSec=5
