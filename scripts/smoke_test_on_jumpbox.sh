@@ -56,3 +56,18 @@ if [ "$BUSYBOX_PHASE" != "Running" ]; then
 fi
 
 kubectl exec -i busybox -- nslookup kubernetes.default.svc.cluster.local
+
+# Verify Cilium + Hubble
+echo "=== Cilium Status ==="
+cilium status || echo "cilium CLI not available, checking pods directly"
+kubectl -n kube-system get pods -l k8s-app=cilium -o wide
+kubectl -n kube-system get pods -l k8s-app=hubble-relay -o wide
+
+echo "=== Hubble Flow Check ==="
+CILIUM_POD=$(kubectl -n kube-system get pods -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}')
+kubectl -n kube-system exec -i "${CILIUM_POD}" -- hubble observe --last 5 || echo "hubble observe not available yet"
+
+echo "=== Bookinfo Verification ==="
+kubectl -n demo get pods
+kubectl -n demo get svc productpage
+

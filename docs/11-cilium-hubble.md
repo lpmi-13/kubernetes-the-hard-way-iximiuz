@@ -126,3 +126,9 @@ Each Cilium agent runs as a DaemonSet pod on every worker. It:
 4. Reports flow data to Hubble Relay via gRPC
 
 Hubble Relay aggregates flow data from all agents and exposes a single gRPC endpoint that clients (Hubble UI, CLI, or custom tools) can connect to.
+
+## Consuming Hubble data
+
+Hubble Relay exposes a gRPC API at `hubble-relay.kube-system.svc.cluster.local:4245`. Any in-cluster workload (or port-forwarded client) can subscribe to this stream to receive real-time network flow events.
+
+The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a planned consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. Once released, it can be deployed with a single `kubectl apply` and accessed via port-forward.
