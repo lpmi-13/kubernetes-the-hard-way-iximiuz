@@ -115,12 +115,21 @@ Ensure the kubelet certificates and kubeconfigs are in place:
 ls -la /var/lib/kubelet/kubelet.crt /var/lib/kubelet/kubelet.key /var/lib/kubelet/kubeconfig
 ```
 
-Determine this worker's pod CIDR based on its hostname:
+Determine this worker's pod CIDR and Tailscale IP:
 
 ```sh
 WORKER_NUMBER=$(hostname | awk -F '-' '{print $2}')
 POD_CIDR="10.200.${WORKER_NUMBER}.0/24"
+NODE_IP=$(tailscale ip -4)
 ```
+
+The `NODE_IP` is the worker's Tailscale address (e.g., `100.x.x.x`). We pass this to kubelet via `--node-ip` so that Kubernetes advertises the Tailscale IP as the node's `InternalIP`. This is critical because:
+
+- Workers are spread across multiple playgrounds, each with its own isolated LAN (`172.16.x.x`)
+- Without `--node-ip`, kubelet auto-detects the `eth0` LAN address, which is only reachable within the same playground
+- Cilium uses the node's `InternalIP` as the outer source/destination for VXLAN tunnel packets
+- If Cilium uses the LAN IP, VXLAN traffic between workers in different playgrounds is unroutable
+- With the Tailscale IP, VXLAN packets are addressed to Tailscale peers and traverse WireGuard tunnels transparently
 
 Create the kubelet configuration file:
 
@@ -158,10 +167,10 @@ tlsPrivateKeyFile: '/var/lib/kubelet/kubelet.key'
 EOF
 ```
 
-Create the `kubelet.service` unit file:
+Create the `kubelet.service` unit file, substituting the Tailscale IP:
 
 ```sh
-cat <<'EOF' > /etc/systemd/system/kubelet.service
+cat <<EOF > /etc/systemd/system/kubelet.service
 [Unit]
 Description=Kubernetes Kubelet
 Documentation=https://github.com/kubernetes/kubernetes
@@ -169,9 +178,10 @@ After=containerd.service
 Requires=containerd.service
 
 [Service]
-ExecStart=/usr/local/bin/kubelet \
-  --config=/var/lib/kubelet/kubelet-config.yaml \
-  --kubeconfig=/var/lib/kubelet/kubeconfig \
+ExecStart=/usr/local/bin/kubelet \\
+  --config=/var/lib/kubelet/kubelet-config.yaml \\
+  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --node-ip=${NODE_IP} \\
   --v=2
 Restart=on-failure
 RestartSec=5
@@ -180,6 +190,8 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 ```
+
+> **Note**: The `--node-ip` flag ensures kubelet registers with the Tailscale IP as the node's `InternalIP`. Without this, kubelet picks the `eth0` LAN address, which is only reachable within the same playground. Cilium relies on `InternalIP` for VXLAN tunnel endpoints, so using the wrong IP breaks cross-playground pod networking.
 
 ### Start the Worker Services
 

@@ -25,6 +25,14 @@ This mega-cluster uses Tailscale to connect workers across multiple playgrounds.
 - These UDP packets traverse Tailscale's WireGuard tunnels like any other traffic
 - No Tailscale configuration changes are needed
 
+### The `--node-ip` requirement
+
+For this to work, each kubelet must be started with `--node-ip` set to the worker's **Tailscale IP** (e.g., `100.x.x.x`). This is done in step 9.
+
+Cilium uses each node's Kubernetes `InternalIP` as the source and destination address for VXLAN tunnel packets. Without `--node-ip`, kubelet auto-detects the `eth0` LAN address (`172.16.x.x`), which is only reachable within the same playground. Workers in different playgrounds would have unreachable VXLAN tunnel endpoints, and cross-playground pod traffic would silently black-hole.
+
+By setting `--node-ip` to the Tailscale address, the Kubernetes node object advertises an IP that is routable across all playgrounds (via Tailscale's WireGuard mesh), and Cilium's VXLAN tunnels just work.
+
 ## Prerequisites
 
 - All worker nodes running with containerd and kubelet (no CNI or kube-proxy)
