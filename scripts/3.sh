@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | length == 1 and .[0].name == "jumpbox") | .id')
 
 labctl cp ./downloads.txt $JUMPBOX_PLAYGROUND_ID:~/downloads.txt
@@ -12,12 +15,13 @@ labctl cp -r ./units $JUMPBOX_PLAYGROUND_ID:~/units
 
 cat scripts/setup_jumpbox.sh | labctl ssh $JUMPBOX_PLAYGROUND_ID
 
-rm kubernetes.ed25519*
+rm -f kubernetes.ed25519*
 
 # we also need to distribute ssh keys so that we can copy stuff from the jumpbox to the other nodes
 ssh-keygen -t ed25519 -C "root@jumpbox" -o -a 100 -f kubernetes.ed25519 -N ""
 
 labctl cp ./kubernetes.ed25519 $JUMPBOX_PLAYGROUND_ID:~/.ssh/
+labctl ssh $JUMPBOX_PLAYGROUND_ID "chmod 600 ~/.ssh/kubernetes.ed25519"
 
 PUBLIC_KEY_VALUE=$(cat ./kubernetes.ed25519.pub | tr -d '\n')
 

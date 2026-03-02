@@ -80,6 +80,7 @@ metadata:
     kubernetes.io/name: "CoreDNS"
 spec:
   replicas: 1
+  progressDeadlineSeconds: 900
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -146,6 +147,7 @@ spec:
             path: /ready
             port: 8181
             scheme: HTTP
+          initialDelaySeconds: 10
       dnsPolicy: Default
       volumes:
         - name: config-volume

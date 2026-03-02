@@ -6,12 +6,12 @@ kubectl apply -f ~/deployments/bookinfo.yaml
 
 echo "[bookinfo] waiting for deployments to be ready"
 for deploy in productpage-v1 details-v1 ratings-v1 reviews-v1 reviews-v2 reviews-v3; do
-  kubectl -n demo rollout status "deployment/${deploy}" --timeout=180s
+  kubectl -n demo rollout status "deployment/${deploy}" --timeout=300s
 done
 
 echo "[bookinfo] deploying traffic generator"
 kubectl apply -f ~/deployments/bookinfo-traffic-generator.yaml
-kubectl -n demo wait --for=condition=Ready pod/traffic-generator --timeout=90s
+kubectl -n demo wait --for=condition=Ready pod/traffic-generator --timeout=180s
 
 NODE_PORT=$(kubectl -n demo get svc productpage -o jsonpath='{.spec.ports[0].nodePort}')
 echo "[bookinfo] productpage available on NodePort ${NODE_PORT}"

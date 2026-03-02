@@ -17,7 +17,16 @@ labctl ssh $JUMPBOX_PLAYGROUND_ID "bash ~/install_haproxy_on_load_balancer.sh"
 labctl ssh $JUMPBOX_PLAYGROUND_ID "bash ~/update_api_host_entries.sh"
 labctl ssh $JUMPBOX_PLAYGROUND_ID "bash ~/bootstrap_control_plane_on_controllers.sh"
 
-labctl ssh $JUMPBOX_PLAYGROUND_ID "sleep 30"
+for i in {1..60}; do
+  if labctl ssh $JUMPBOX_PLAYGROUND_ID "ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 'kubectl get componentstatuses --kubeconfig /root/admin.kubeconfig'" >/dev/null 2>&1; then
+    break
+  fi
+  if [ "$i" -eq 60 ]; then
+    echo "timed out waiting for API server to respond" >&2
+    exit 1
+  fi
+  sleep 2
+done
 
 labctl ssh $JUMPBOX_PLAYGROUND_ID "scp -i ~/.ssh/kubernetes.ed25519 ~/configs/kube-api-server-to-kubelet.yaml root@controller-1:/root/kube-api-server-to-kubelet.yaml"
 labctl ssh $JUMPBOX_PLAYGROUND_ID "scp -i ~/.ssh/kubernetes.ed25519 ~/set_up_rbac.sh root@controller-1:/root/set_up_rbac.sh"

@@ -1,6 +1,9 @@
-wget -q --show-progress \
+#!/usr/bin/env bash
+set -euo pipefail
+
+wget --show-progress \
   --https-only \
-  --timestamping \
+  --tries=3 \
   -P downloads \
   -i downloads.txt
 

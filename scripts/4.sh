@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
 JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | length == 1 and .[0].name == "jumpbox") | .id')
 
 labctl cp ./ca.conf $JUMPBOX_PLAYGROUND_ID:~/ca.conf

@@ -55,7 +55,17 @@ if [ "$BUSYBOX_PHASE" != "Running" ]; then
   kubectl wait --for=condition=Ready pod/busybox --timeout=90s
 fi
 
-kubectl exec busybox -- nslookup kubernetes.default.svc.cluster.local
+for attempt in {1..55}; do
+  if kubectl exec busybox -- nslookup kubernetes.default.svc.cluster.local; then
+    break
+  fi
+  if [ "$attempt" -eq 55 ]; then
+    echo "nslookup failed after 55 attempts" >&2
+    exit 1
+  fi
+  echo "exec attempt ${attempt} failed; retrying in 2s..."
+  sleep 2
+done
 
 # Verify Cilium + Hubble
 echo "=== Cilium Status ==="

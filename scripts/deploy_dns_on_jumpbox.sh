@@ -2,7 +2,7 @@
 set -euo pipefail
 
 kubectl apply -f ~/deployments/core-dns.yaml
-kubectl -n kube-system rollout status deployment/coredns
+kubectl -n kube-system rollout status deployment/coredns --timeout=900s
 kubectl get pods -l k8s-app=kube-dns -n kube-system
 
 COREDNS_NODE="$(kubectl -n kube-system get pod -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.nodeName}')"
@@ -29,7 +29,7 @@ done
 # Confirm Hubble Relay is now healthy (it needs CoreDNS for DNS resolution)
 echo ""
 echo "=== Verifying Hubble Relay ==="
-kubectl -n kube-system rollout status deployment/hubble-relay --timeout=120s
+kubectl -n kube-system rollout status deployment/hubble-relay --timeout=300s
 echo ""
 echo "=== Full Cilium + Hubble Status ==="
 cilium status --wait=false
