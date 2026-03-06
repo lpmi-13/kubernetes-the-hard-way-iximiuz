@@ -102,4 +102,4 @@ Re-run the DNS lookup from the busybox pod:
 kubectl exec -it busybox -- nslookup kubernetes.default.svc.cluster.local
 ```
 
-Next: [Cleanup](14-cleanup.md)
+Next: [Optional: Hubble Gazer Visualizer](14-hubble-gazer-visualizer.md)

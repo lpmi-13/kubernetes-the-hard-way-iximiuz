@@ -59,4 +59,4 @@ worker-8   Ready    <none>   5m52s   v1.32.3
 worker-9   Ready    <none>   5m23s   v1.32.3
 ```
 
-Next: [Provisioning Pod Network Routes](11-pod-network-routes.md)
+Next: [Deploying Cilium and Hubble](11-cilium-hubble.md)

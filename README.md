@@ -59,16 +59,8 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 12) We deploy CoreDNS and verify in-cluster name resolution.
 
-13) We deploy the Bookinfo sample application with a traffic generator and run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, DNS resolution, Cilium/Hubble health, and Bookinfo connectivity. At this point Hubble Relay is collecting live flow data, ready to be consumed by an external tool.
+13) We deploy the Bookinfo sample application with a traffic generator and run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, DNS resolution, Cilium/Hubble health, and Bookinfo connectivity.
 
-14) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds.
+14) Optional add-on: deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) to consume Hubble Relay flow data and visualize live traffic in a browser tab via exposed ports.
 
-## Next steps
-
-Once the [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is complete, it can be deployed into the cluster as a single container that connects to Hubble Relay's gRPC API (`hubble-relay.kube-system.svc.cluster.local:4245`). The expected workflow is:
-
-```bash
-kubectl apply -f https://github.com/lpmi-13/hubble-gazer/releases/latest/download/kthw-viz.yaml
-kubectl -n kube-system port-forward svc/hubble-gazer 8080:80
-# then open http://localhost:8080
-```
+15) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds.
