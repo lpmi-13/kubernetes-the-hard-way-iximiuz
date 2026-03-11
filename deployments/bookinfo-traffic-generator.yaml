@@ -1,22 +1,210 @@
 apiVersion: v1
-kind: Pod
+kind: ConfigMap
+metadata:
+  name: traffic-generator-scripts
+  namespace: demo
+data:
+  productpage-wave.sh: |
+    #!/bin/sh
+    set -eu
+
+    bookinfo_url="${BOOKINFO_URL:-http://productpage.demo:9080/productpage}"
+    phase_counter=0
+
+    rand_between() {
+      min="$1"
+      max="$2"
+      phase_counter=$((phase_counter + 1))
+      span=$((max - min + 1))
+      seed="$(date +%s)"
+      host_seed="$(hostname | cksum | awk '{print $1}')"
+      echo $((min + ((seed + host_seed + phase_counter) % span)))
+    }
+
+    run_phase() {
+      phase_name="$1"
+      workers="$2"
+      pause_seconds="$3"
+      duration_seconds="$4"
+      end_time=$(( $(date +%s) + duration_seconds ))
+      pids=""
+      i=1
+
+      echo "[productpage] phase=${phase_name} workers=${workers} pause=${pause_seconds}s duration=${duration_seconds}s"
+
+      while [ "${i}" -le "${workers}" ]; do
+        (
+          while [ "$(date +%s)" -lt "${end_time}" ]; do
+            curl -fsS -o /dev/null "${bookinfo_url}" || true
+            sleep "${pause_seconds}"
+          done
+        ) &
+        pids="${pids} $!"
+        i=$((i + 1))
+      done
+
+      wait ${pids} || true
+    }
+
+    startup_delay="$(rand_between 0 10)"
+    echo "[productpage] startup delay ${startup_delay}s"
+    sleep "${startup_delay}"
+
+    while true; do
+      run_phase baseline "$(rand_between 2 4)" 0.35 "$(rand_between 45 70)"
+      run_phase burst "$(rand_between 10 16)" 0.05 "$(rand_between 25 40)"
+      run_phase cooldown 1 1 "$(rand_between 60 90)"
+    done
+  queue-wave.sh: |
+    #!/bin/sh
+    set -eu
+
+    redis_host="${REDIS_HOST:-redis.demo.svc.cluster.local}"
+    redis_port="${REDIS_PORT:-6379}"
+    queue_name="${QUEUE_NAME:-demo-jobs}"
+    job_work_iterations="${JOB_WORK_ITERATIONS:-300000}"
+    phase_counter=0
+
+    rand_between() {
+      min="$1"
+      max="$2"
+      phase_counter=$((phase_counter + 1))
+      span=$((max - min + 1))
+      seed="$(date +%s)"
+      host_seed="$(hostname | cksum | awk '{print $1}')"
+      echo $((min + ((seed + host_seed + phase_counter) % span)))
+    }
+
+    push_batch() {
+      count="$1"
+      i=0
+      while [ "${i}" -lt "${count}" ]; do
+        redis-cli -h "${redis_host}" -p "${redis_port}" LPUSH "${queue_name}" "work:${job_work_iterations}" >/dev/null
+        i=$((i + 1))
+      done
+    }
+
+    run_enqueue_phase() {
+      phase_name="$1"
+      duration_seconds="$2"
+      parallel_pushers="$3"
+      batch_size="$4"
+      pause_seconds="$5"
+      end_time=$(( $(date +%s) + duration_seconds ))
+
+      echo "[queue] phase=${phase_name} pushers=${parallel_pushers} batch=${batch_size} pause=${pause_seconds}s duration=${duration_seconds}s"
+
+      while [ "$(date +%s)" -lt "${end_time}" ]; do
+        pids=""
+        i=1
+        while [ "${i}" -le "${parallel_pushers}" ]; do
+          push_batch "${batch_size}" &
+          pids="${pids} $!"
+          i=$((i + 1))
+        done
+        wait ${pids} || true
+        sleep "${pause_seconds}"
+      done
+    }
+
+    run_idle_phase() {
+      phase_name="$1"
+      duration_seconds="$2"
+
+      echo "[queue] phase=${phase_name} pushers=0 batch=0 pause=${duration_seconds}s duration=${duration_seconds}s"
+      sleep "${duration_seconds}"
+    }
+
+    startup_delay="$(rand_between 0 10)"
+    echo "[queue] startup delay ${startup_delay}s"
+    sleep "${startup_delay}"
+
+    while true; do
+      run_enqueue_phase baseline "$(rand_between 35 50)" 1 "$(rand_between 3 5)" 3
+      run_enqueue_phase burst "$(rand_between 25 40)" "$(rand_between 2 3)" "$(rand_between 10 18)" 1
+      run_idle_phase cooldown "$(rand_between 120 150)"
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: traffic-generator
   namespace: demo
   labels:
     app: traffic-generator
 spec:
-  containers:
-  - name: traffic-generator
-    image: curlimages/curl:8.12.1
-    command:
-    - /bin/sh
-    - -c
-    - |
-      echo "Starting traffic generation against productpage..."
-      while true; do
-        curl -s -o /dev/null -w "%{http_code}" http://productpage.demo:9080/productpage
-        echo ""
-        sleep 2
-      done
-  restartPolicy: Always
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic-generator
+  template:
+    metadata:
+      labels:
+        app: traffic-generator
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: traffic-generator
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: traffic-generator
+      containers:
+      - name: productpage-generator
+        image: curlimages/curl:8.12.1
+        command:
+        - /bin/sh
+        - /scripts/productpage-wave.sh
+        env:
+        - name: BOOKINFO_URL
+          value: http://productpage.demo:9080/productpage
+        volumeMounts:
+        - name: traffic-scripts
+          mountPath: /scripts
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+      - name: queue-generator
+        image: docker.io/library/redis:7.2-alpine
+        command:
+        - /bin/sh
+        - /scripts/queue-wave.sh
+        env:
+        - name: REDIS_HOST
+          value: redis.demo.svc.cluster.local
+        - name: REDIS_PORT
+          value: "6379"
+        - name: QUEUE_NAME
+          value: demo-jobs
+        - name: JOB_WORK_ITERATIONS
+          value: "300000"
+        volumeMounts:
+        - name: traffic-scripts
+          mountPath: /scripts
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+      volumes:
+      - name: traffic-scripts
+        configMap:
+          name: traffic-generator-scripts
+          defaultMode: 0755

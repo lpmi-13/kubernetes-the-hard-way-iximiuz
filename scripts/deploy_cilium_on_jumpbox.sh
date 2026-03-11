@@ -3,6 +3,22 @@ set -euo pipefail
 
 CILIUM_VERSION="1.16.5"
 
+require_worker_nodes() {
+  local expected="${1:-9}"
+  local node_output worker_count
+
+  node_output="$(kubectl get nodes 2>/dev/null || true)"
+  worker_count="$(printf '%s\n' "${node_output}" | awk '$1 ~ /^worker-/ {count++} END {print count+0}')"
+  if [ "${worker_count}" -lt "${expected}" ]; then
+    echo "[cilium] expected ${expected} registered worker nodes before install, found ${worker_count}" >&2
+    printf '%s\n' "${node_output}" >&2
+    echo "[cilium] rerun the worker bootstrap and kubectl configuration steps before step 11" >&2
+    exit 1
+  fi
+}
+
+require_worker_nodes 9
+
 echo "[cilium] adding Cilium Helm repository"
 helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
 helm repo update cilium

@@ -25,13 +25,16 @@ if [ -z "${JUMPBOX_PLAYGROUND_ID}" ] || [ "${JUMPBOX_PLAYGROUND_ID}" = "null" ];
   exit 1
 fi
 
-# Copy deployment manifests and scripts
-retry_cmd 5 labctl cp -r ./deployments "$JUMPBOX_PLAYGROUND_ID":~/deployments
-retry_cmd 5 labctl cp ./scripts/deploy_bookinfo_on_jumpbox.sh "$JUMPBOX_PLAYGROUND_ID":~/deploy_bookinfo_on_jumpbox.sh
-retry_cmd 5 labctl cp ./scripts/smoke_test_on_jumpbox.sh "$JUMPBOX_PLAYGROUND_ID":~/smoke_test_on_jumpbox.sh
+retry_cmd 5 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "rm -rf ~/deployments"
+retry_cmd 5 labctl cp -r ./deployments "${JUMPBOX_PLAYGROUND_ID}":~/deployments
+retry_cmd 5 labctl cp ./ca.conf "${JUMPBOX_PLAYGROUND_ID}":~/ca.conf
+retry_cmd 5 labctl cp ./units/kube-apiserver.service "${JUMPBOX_PLAYGROUND_ID}":~/kube-apiserver.service
+retry_cmd 5 labctl cp ./scripts/enable_aggregation_layer_on_jumpbox.sh "${JUMPBOX_PLAYGROUND_ID}":~/enable_aggregation_layer_on_jumpbox.sh
+retry_cmd 5 labctl cp ./scripts/install_keda_on_jumpbox.sh "${JUMPBOX_PLAYGROUND_ID}":~/install_keda_on_jumpbox.sh
+retry_cmd 5 labctl cp ./scripts/deploy_bookinfo_on_jumpbox.sh "${JUMPBOX_PLAYGROUND_ID}":~/deploy_bookinfo_on_jumpbox.sh
+retry_cmd 5 labctl cp ./scripts/smoke_test_on_jumpbox.sh "${JUMPBOX_PLAYGROUND_ID}":~/smoke_test_on_jumpbox.sh
 
-# Deploy Bookinfo application
-retry_cmd 5 labctl ssh "$JUMPBOX_PLAYGROUND_ID" "bash ~/deploy_bookinfo_on_jumpbox.sh"
-
-# Run smoke tests
-retry_cmd 5 labctl ssh "$JUMPBOX_PLAYGROUND_ID" "bash ~/smoke_test_on_jumpbox.sh"
+retry_cmd 5 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "bash ~/enable_aggregation_layer_on_jumpbox.sh"
+retry_cmd 5 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "bash ~/install_keda_on_jumpbox.sh"
+retry_cmd 5 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "bash ~/deploy_bookinfo_on_jumpbox.sh"
+retry_cmd 5 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "bash ~/smoke_test_on_jumpbox.sh"

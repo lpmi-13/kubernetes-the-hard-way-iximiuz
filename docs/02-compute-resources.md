@@ -289,6 +289,8 @@ for playground_id in $(labctl playground list -q); do
 done
 ```
 
+At this stage it is worth confirming that workers in different playgrounds can reach each other cleanly over Tailscale. Early worker-to-worker reachability problems often show up later as kubelet, metrics, or cross-node networking failures.
+
 ### Cleanup
 
 Use the repo cleanup script when you want to tear down lab resources. It now removes stale, offline Tailscale devices that match current lab machine names and tag before destroying playgrounds.

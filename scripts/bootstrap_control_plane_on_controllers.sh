@@ -24,6 +24,8 @@ chmod +x kube-apiserver kube-controller-manager kube-scheduler kubectl
 mv kube-apiserver kube-controller-manager kube-scheduler kubectl /usr/local/bin/
 
 cp ca.crt ca.key \
+  front-proxy-ca.crt \
+  front-proxy-client.crt front-proxy-client.key \
   kube-api-server.crt kube-api-server.key \
   service-accounts.crt service-accounts.key \
   encryption-config.yaml /var/lib/kubernetes/

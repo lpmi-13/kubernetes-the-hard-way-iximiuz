@@ -150,6 +150,8 @@ Move the certificates and encryption config into place:
 
 ```sh
 cp ca.crt ca.key \
+  front-proxy-ca.crt \
+  front-proxy-client.crt front-proxy-client.key \
   kube-api-server.crt kube-api-server.key \
   service-accounts.crt service-accounts.key \
   encryption-config.yaml /var/lib/kubernetes/
@@ -180,10 +182,18 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --enable-admission-plugins=NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \\
   --etcd-servers=http://127.0.0.1:2379 \\
   --event-ttl=1h \\
+  --enable-aggregator-routing=true \\
   --encryption-provider-config=/var/lib/kubernetes/encryption-config.yaml \\
   --kubelet-certificate-authority=/var/lib/kubernetes/ca.crt \\
   --kubelet-client-certificate=/var/lib/kubernetes/kube-api-server.crt \\
   --kubelet-client-key=/var/lib/kubernetes/kube-api-server.key \\
+  --proxy-client-cert-file=/var/lib/kubernetes/front-proxy-client.crt \\
+  --proxy-client-key-file=/var/lib/kubernetes/front-proxy-client.key \\
+  --requestheader-allowed-names=front-proxy-client \\
+  --requestheader-client-ca-file=/var/lib/kubernetes/front-proxy-ca.crt \\
+  --requestheader-extra-headers-prefix=X-Remote-Extra- \\
+  --requestheader-group-headers=X-Remote-Group \\
+  --requestheader-username-headers=X-Remote-User \\
   --runtime-config='api/all=true' \\
   --service-account-key-file=/var/lib/kubernetes/service-accounts.crt \\
   --service-account-signing-key-file=/var/lib/kubernetes/service-accounts.key \\

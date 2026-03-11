@@ -59,8 +59,8 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 12) We deploy CoreDNS and verify in-cluster name resolution.
 
-13) We deploy the Bookinfo sample application with a traffic generator and run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, DNS resolution, Cilium/Hubble health, and Bookinfo connectivity.
+13) We install KEDA, deploy the Bookinfo sample application with wave-based traffic generation plus a Redis-backed worker queue, and run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, DNS resolution, Cilium/Hubble health, Bookinfo connectivity, and visible KEDA-driven worker scale-out and scale-in.
 
-14) Optional add-on: deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) to consume Hubble Relay flow data and visualize live traffic in a browser tab via exposed ports.
+14) Optional add-on: deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.3.0` to consume Hubble Relay flow data and visualize live traffic in a browser tab via exposed ports.
 
 15) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds.

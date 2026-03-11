@@ -1,0 +1,185 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: async-worker-scripts
+  namespace: demo
+data:
+  worker.sh: |
+    #!/bin/sh
+    set -eu
+
+    redis_host="${REDIS_HOST:-redis.demo.svc.cluster.local}"
+    redis_port="${REDIS_PORT:-6379}"
+    queue_name="${QUEUE_NAME:-demo-jobs}"
+    work_iterations="${WORK_ITERATIONS:-300000}"
+    idle_sleep_seconds="${IDLE_SLEEP_SECONDS:-1}"
+    processed=0
+
+    cpu_burn() {
+      limit="$1"
+      i=0
+      value=7
+      while [ "$i" -lt "$limit" ]; do
+        value=$(( (value * 33 + i * 17 + 19) % 2147483647 ))
+        i=$((i + 1))
+      done
+      printf '%s' "$value" >/dev/null
+    }
+
+    echo "[worker] listening on ${redis_host}:${redis_port}, queue=${queue_name}, iterations=${work_iterations}"
+
+    while true; do
+      payload="$(redis-cli -h "${redis_host}" -p "${redis_port}" --raw BRPOP "${queue_name}" 5 2>/dev/null | tail -n 1 || true)"
+      if [ -z "${payload}" ]; then
+        sleep "${idle_sleep_seconds}"
+        continue
+      fi
+
+      iterations="${work_iterations}"
+      case "${payload}" in
+        work:*)
+          candidate="${payload#work:}"
+          case "${candidate}" in
+            ''|*[!0-9]*)
+              ;;
+            *)
+              iterations="${candidate}"
+              ;;
+          esac
+          ;;
+      esac
+
+      cpu_burn "${iterations}"
+      processed=$((processed + 1))
+
+      if [ $((processed % 20)) -eq 0 ]; then
+        echo "[worker] processed=${processed}"
+      fi
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: demo
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: docker.io/library/redis:7.2-alpine
+        args:
+        - redis-server
+        - --save
+        - ""
+        - --appendonly
+        - "no"
+        ports:
+        - containerPort: 6379
+          name: redis
+        readinessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: demo
+  labels:
+    app: redis
+spec:
+  ports:
+  - port: 6379
+    targetPort: redis
+    name: redis
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-worker
+  namespace: demo
+  labels:
+    app: demo-worker
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: demo-worker
+  template:
+    metadata:
+      labels:
+        app: demo-worker
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: demo-worker
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: demo-worker
+      containers:
+      - name: worker
+        image: docker.io/library/redis:7.2-alpine
+        command:
+        - /bin/sh
+        - /scripts/worker.sh
+        env:
+        - name: REDIS_HOST
+          value: redis.demo.svc.cluster.local
+        - name: REDIS_PORT
+          value: "6379"
+        - name: QUEUE_NAME
+          value: demo-jobs
+        - name: WORK_ITERATIONS
+          value: "300000"
+        volumeMounts:
+        - name: worker-scripts
+          mountPath: /scripts
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+      volumes:
+      - name: worker-scripts
+        configMap:
+          name: async-worker-scripts
+          defaultMode: 0755

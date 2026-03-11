@@ -3,14 +3,22 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOTENV_FILE="${DOTENV_FILE:-${REPO_ROOT}/.env}"
+JUMPBOX_PUBLIC_KEY_FILE="${JUMPBOX_PUBLIC_KEY_FILE:-${REPO_ROOT}/kubernetes.ed25519.pub}"
 
-# Tailscale cleanup: remove devices that match current lab machine names and tag.
-if [ -f "$DOTENV_FILE" ]; then
+if [ "$#" -lt 1 ]; then
+  echo "Usage: scripts/rebuild_worker_playgrounds.sh <cluster-index> [<cluster-index> ...]" >&2
+  exit 1
+fi
+
+if [ -f "${DOTENV_FILE}" ]; then
   set -a
   # shellcheck disable=SC1090
-  . "$DOTENV_FILE"
+  . "${DOTENV_FILE}"
   set +a
 fi
+
+: "${TS_API_CLIENT_ID:?TS_API_CLIENT_ID must be set}"
+: "${TS_API_CLIENT_SECRET:?TS_API_CLIENT_SECRET must be set}"
 
 TS_TAGS="${TS_TAGS:-tag:kthw}"
 
@@ -50,9 +58,29 @@ wait_for_running_machines() {
   return 1
 }
 
-delete_tailscale_devices_matching_hosts() {
-  local context_label="$1"
+wait_for_playgrounds_absent() {
+  local max_attempts="$1"
   shift
+  local -a playground_ids=("$@")
+  local existing_ids playground_id
+
+  for _ in $(seq 1 "${max_attempts}"); do
+    existing_ids="$(labctl playground list -q || true)"
+
+    for playground_id in "${playground_ids[@]}"; do
+      if grep -qx "${playground_id}" <<<"${existing_ids}"; then
+        sleep 2
+        continue 2
+      fi
+    done
+
+    return 0
+  done
+
+  return 1
+}
+
+delete_tailscale_devices_matching_hosts() {
   local -a machine_names=("$@")
   local oauth_resp_file oauth_http_code access_token
   local devices_resp_file devices_http_code api_message
@@ -63,11 +91,7 @@ delete_tailscale_devices_matching_hosts() {
   local -A required_tags=()
   local -a ts_tags_array=()
   local -a device_tags=()
-  local tag device_tag
-
-  if [ "${#machine_names[@]}" -eq 0 ]; then
-    return 0
-  fi
+  local name tag device_tag
 
   oauth_resp_file="$(mktemp)"
   oauth_http_code="$(
@@ -78,7 +102,7 @@ delete_tailscale_devices_matching_hosts() {
   )"
   if [ "${oauth_http_code}" -ne 200 ]; then
     api_message="$(jq -r '.message // empty' "${oauth_resp_file}" 2>/dev/null || true)"
-    echo "tailscale cleanup failed (${context_label}): unable to mint OAuth token (HTTP ${oauth_http_code})." >&2
+    echo "tailscale cleanup failed: unable to mint OAuth token (HTTP ${oauth_http_code})." >&2
     [ -n "${api_message}" ] && echo "tailscale API message: ${api_message}" >&2
     rm -f "${oauth_resp_file}"
     return 1
@@ -94,7 +118,7 @@ delete_tailscale_devices_matching_hosts() {
   )"
   if [ "${devices_http_code}" -ne 200 ]; then
     api_message="$(jq -r '.message // empty' "${devices_resp_file}" 2>/dev/null || true)"
-    echo "tailscale cleanup failed (${context_label}): unable to list devices (HTTP ${devices_http_code})." >&2
+    echo "tailscale cleanup failed: unable to list devices (HTTP ${devices_http_code})." >&2
     [ -n "${api_message}" ] && echo "tailscale API message: ${api_message}" >&2
     rm -f "${devices_resp_file}"
     return 1
@@ -170,7 +194,7 @@ delete_tailscale_devices_matching_hosts() {
   done < <(jq -r '(.devices // [])[] | [(.id // ""), (.name // .hostname // ""), ((.online // false)|tostring), ((.tags // [])|join(","))] | @tsv' "${devices_resp_file}")
 
   rm -f "${devices_resp_file}"
-  echo "tailscale cleanup summary (${context_label}): ${cleanup_candidates} candidates, ${cleanup_deleted} deleted, ${cleanup_failed} failed."
+  echo "tailscale cleanup summary (worker-cluster rebuild): ${cleanup_candidates} candidates, ${cleanup_deleted} deleted, ${cleanup_failed} failed."
 
   [ "${cleanup_failed}" -eq 0 ]
 }
@@ -261,206 +285,117 @@ EOF
   sleep 10
 }
 
-if [ -n "${TS_API_CLIENT_ID:-}" ] && [ -n "${TS_API_CLIENT_SECRET:-}" ]; then
-  if ! command -v labctl >/dev/null 2>&1; then
-    echo "labctl not found; skipping tailscale cleanup" >&2
-  elif ! command -v jq >/dev/null 2>&1; then
-    echo "jq not found; skipping tailscale cleanup" >&2
-  elif ! command -v curl >/dev/null 2>&1; then
-    echo "curl not found; skipping tailscale cleanup" >&2
-  else
-    echo "cleaning up tailscale devices..."
-    mapfile -t existing_machine_names < <(labctl playground list -o json | jq -r '(. // [])[]? | (.machines // [])[].name // empty')
-    if ! delete_tailscale_devices_matching_hosts "initial cleanup" "${existing_machine_names[@]}"; then
-      echo "tailscale cleanup failed; aborting before playground rebuild." >&2
-      exit 1
-    fi
+worker_cluster_id() {
+  local cluster_index="$1"
+  local anchor_worker
+
+  anchor_worker="$(worker_names_for_cluster "${cluster_index}" | head -n 1)"
+  labctl playground list -o json \
+    | jq -r --arg machine "${anchor_worker}" '.[] | select(.status.stateEvents[-1].state == "RUNNING") | select(any(.machines[]; .name == $machine)) | .id'
+}
+
+log_worker_cluster_network_fingerprint() {
+  local cluster_index="$1"
+  local playground_id worker
+
+  playground_id="$(worker_cluster_id "${cluster_index}")"
+  if [ -z "${playground_id}" ]; then
+    echo "unable to find worker-cluster-${cluster_index} for network fingerprint logging" >&2
+    return 1
   fi
-else
-  echo "tailscale cleanup skipped (TS_API_CLIENT_ID/TS_API_CLIENT_SECRET not set)"
-fi
 
-# just to keep this tidy, clean up any existing playgrounds first
-echo "checking for existing playgrounds to clean up..."
-existing_playgrounds=$(labctl playground list -q || true)
-if [ -n "${existing_playgrounds}" ]; then
-  for playground_id in ${existing_playgrounds}; do
-    labctl playground destroy "${playground_id}"
-  done
-
-  echo "waiting for playgrounds to be destroyed..."
-  for _ in {1..60}; do
-    if [ -z "$(labctl playground list -q || true)" ]; then
-      break
+  echo "worker-cluster-${cluster_index} network fingerprint before rebuild (${playground_id}):"
+  while IFS= read -r worker; do
+    [ -n "${worker}" ] || continue
+    if ! labctl ssh "${playground_id}" --machine "${worker}" <<EOF
+set -eu
+public_ipv4="\$(tailscale netcheck 2>/dev/null | awk '/IPv4:/ {split(\$4, parts, ":"); print parts[1]; exit}')"
+eth0_cidrs="\$(ip -4 -o addr show dev eth0 | awk '{print \$4}' | paste -sd, -)"
+default_gw="\$(ip route show default | awk '/default/ {print \$3; exit}')"
+tailscale_ip="\$(tailscale ip -4 2>/dev/null | tr -d '\r')"
+printf '%s public_ipv4=%s eth0=%s default_gw=%s tailscale_ip=%s\n' "${worker}" "\${public_ipv4:-unknown}" "\${eth0_cidrs:-unknown}" "\${default_gw:-unknown}" "\${tailscale_ip:-unknown}"
+EOF
+    then
+      echo "${worker} public_ipv4=unknown eth0=unknown default_gw=unknown tailscale_ip=unknown" >&2
     fi
-    sleep 2
-  done
-fi
+  done < <(worker_names_for_cluster "${cluster_index}")
+}
 
-# Set up 3 worker clusters with sequential worker numbering (1-9)
-for i in {1..3}; do
-  start_worker_playground "${i}"
+enroll_workers_with_tailscale() {
+  local worker
+
+  for worker in "$@"; do
+    echo "re-enrolling ${worker} in tailscale..."
+    bash "${REPO_ROOT}/scripts/provision_tailscale_oauth_oneoff.sh" --only "${worker}"
+  done
+}
+
+restore_jumpbox_ssh_access() {
+  local -a worker_names=("$@")
+  local public_key_value worker playground_id update_script
+
+  if [ ! -f "${JUMPBOX_PUBLIC_KEY_FILE}" ]; then
+    return 0
+  fi
+
+  public_key_value="$(tr -d '\n' < "${JUMPBOX_PUBLIC_KEY_FILE}")"
+  update_script="$(sed "s|PUBLIC_KEY_VALUE|$(printf '%s' "${public_key_value}" | sed 's/[&/\]/\\&/g')|" "${REPO_ROOT}/scripts/update_authorized_keys.sh")"
+
+  for worker in "${worker_names[@]}"; do
+    playground_id="$(labctl playground list -o json | jq -r --arg machine "${worker}" '.[] | select(.status.stateEvents[-1].state == "RUNNING") | select(any(.machines[]; .name == $machine)) | .id')"
+    if [ -z "${playground_id}" ]; then
+      echo "unable to find ${worker} to restore jumpbox ssh access" >&2
+      return 1
+    fi
+    echo "restoring jumpbox ssh access on ${worker}..."
+    echo "${update_script}" | labctl ssh "${playground_id}" --machine "${worker}"
+  done
+}
+
+cluster_indexes=("$@")
+playground_ids=()
+worker_names=()
+
+for cluster_index in "${cluster_indexes[@]}"; do
+  log_worker_cluster_network_fingerprint "${cluster_index}"
+  playground_id="$(worker_cluster_id "${cluster_index}")"
+  if [ -z "${playground_id}" ]; then
+    echo "unable to find worker-cluster-${cluster_index} for rebuild" >&2
+    exit 1
+  fi
+  playground_ids+=("${playground_id}")
+  while IFS= read -r worker; do
+    [ -n "${worker}" ] || continue
+    worker_names+=("${worker}")
+  done < <(worker_names_for_cluster "${cluster_index}")
 done
 
-# set up the cluster with 3 controller nodes
-echo "starting controller cluster..."
-labctl playground start flexbox -f -<<EOF
-  kind: playground
-  name: controller-cluster
-  title: Controller Cluster
-  description: controller node cluster for the iximiuz kubernetes cluster of clusters
-  categories:
-      - linux
-      - kubernetes
-  playground:
-      networks:
-          - name: local
-            subnet: 172.16.4.0/24
-      machines:
-          - name: controller-1
-            users:
-              - name: root
-                default: true
-            drives:
-              - source: ubuntu-24-04
-                mount: /
-                size: 30GiB
-            network:
-              interfaces:
-                  - network: local
-            resources:
-              cpuCount: 2
-              ramSize: 4GiB
-          - name: controller-2
-            users:
-              - name: root
-                default: true
-            drives:
-              - source: ubuntu-24-04
-                mount: /
-                size: 30GiB
-            network:
-              interfaces:
-                  - network: local
-            resources:
-              cpuCount: 2
-              ramSize: 4GiB
+for playground_id in "${playground_ids[@]}"; do
+  echo "destroying worker playground ${playground_id}..."
+  labctl playground destroy "${playground_id}"
+done
 
-          - name: controller-3
-            users:
-              - name: root
-                default: true
-            drives:
-              - source: ubuntu-24-04
-                mount: /
-                size: 30GiB
-            network:
-              interfaces:
-                  - network: local
-            resources:
-              cpuCount: 2
-              ramSize: 4GiB
+echo "waiting for worker playground replacements to clear..."
+if ! wait_for_playgrounds_absent 60 "${playground_ids[@]}"; then
+  echo "timed out waiting for worker playground(s) to be destroyed." >&2
+  exit 1
+fi
 
-          - name: load-balancer
-            users:
-              - name: root
-                default: true
-            drives:
-              - source: ubuntu-24-04
-                mount: /
-                size: 30GiB
-            network:
-              interfaces:
-                  - network: local
-            resources:
-              cpuCount: 2
-              ramSize: 4GiB
-      tabs:
-          - id: terminal-controller-1
-            kind: terminal
-            name: controller-1
-            machine: controller-1
-          - id: terminal-controller-2
-            kind: terminal
-            name: controller-2
-            machine: controller-2
-          - id: terminal-controller-3
-            kind: terminal
-            name: controller-3
-            machine: controller-3
-          - id: terminal-load-balancer
-            kind: terminal
-            name: load-balancer
-            machine: load-balancer
-      accessControl:
-          canList:
-              - anyone
-          canRead:
-              - anyone
-          canStart:
-              - anyone
-EOF
+if ! delete_tailscale_devices_matching_hosts "${worker_names[@]}"; then
+  echo "failed to remove stale tailscale devices for rebuilt workers." >&2
+  exit 1
+fi
 
-# and now we configure the jumpbox where we install all the tooling (so we don't clutter your local workstation)
-echo "starting jumpbox..."
-labctl playground start flexbox -f -<<EOF
-  kind: playground
-  name: jumpbox
-  title: Jumpbox
-  description: jumpbox for running all the commands into the cluster of clusters
-  categories:
-      - linux
-      - kubernetes
-  playground:
-      networks:
-          - name: local
-            subnet: 172.16.5.0/24
-      machines:
-          - name: jumpbox
-            users:
-              - name: root
-                default: true
-            drives:
-              - source: ubuntu-24-04
-                mount: /
-                size: 30GiB
-            network:
-              interfaces:
-                  - network: local
-            resources:
-              cpuCount: 2
-              ramSize: 4GiB
-      tabs:
-          - id: terminal-jumpbox
-            kind: terminal
-            name: jumpbox
-            machine: jumpbox
-      accessControl:
-          canList:
-              - anyone
-          canRead:
-              - anyone
-          canStart:
-              - anyone
-EOF
+for cluster_index in "${cluster_indexes[@]}"; do
+  start_worker_playground "${cluster_index}"
+done
 
-echo "waiting for all playgrounds to reach RUNNING before tailscale enrollment..."
-required_machines=(
-  controller-1 controller-2 controller-3 load-balancer jumpbox
-  worker-1 worker-2 worker-3 worker-4 worker-5 worker-6 worker-7 worker-8 worker-9
-)
-
-if ! wait_for_running_machines 60 "${required_machines[@]}"; then
-  echo "timed out waiting for all machines to be RUNNING; current status:" >&2
+echo "waiting for rebuilt worker nodes to reach RUNNING..."
+if ! wait_for_running_machines 60 "${worker_names[@]}"; then
+  echo "timed out waiting for rebuilt worker nodes to reach RUNNING." >&2
   labctl playground list -o json | jq -r '.[] | "\(.id)\t\(.status.stateEvents[-1].state)\t\([.machines[].name] | join(","))"' >&2
   exit 1
 fi
 
-if [ ! -f "$DOTENV_FILE" ]; then
-  echo "missing .env; create it from .env.example before provisioning tailscale" >&2
-  exit 1
-fi
-
-. "$DOTENV_FILE"
-
-bash "${REPO_ROOT}/scripts/provision_tailscale_oauth_oneoff.sh"
+enroll_workers_with_tailscale "${worker_names[@]}"
+restore_jumpbox_ssh_access "${worker_names[@]}"

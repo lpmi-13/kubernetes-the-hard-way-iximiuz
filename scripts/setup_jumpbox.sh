@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+rm -rf downloads
+mkdir -p downloads
+
 wget --show-progress \
   --https-only \
   --tries=3 \

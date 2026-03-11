@@ -1,8 +1,9 @@
 # Optional: Hubble Gazer Visualizer
 
-In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer), a web UI that consumes Hubble Relay flow data and renders a live service traffic graph in your browser.
+In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.3.0`, a web UI that consumes Hubble Relay flow data and renders a live service traffic graph in your browser.
 
 This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay.kube-system.svc.cluster.local:80` (the relay Service port in this cluster).
+The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.3.0`.
 
 ## Prerequisites
 

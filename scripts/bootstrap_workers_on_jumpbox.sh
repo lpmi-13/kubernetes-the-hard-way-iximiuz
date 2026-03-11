@@ -12,7 +12,23 @@ WORKER_BINARIES=(
 for host in worker-{1..9}; do
   echo "[worker] preparing ${host}"
 
-  ssh -i "${SSH_KEY}" root@${host} "mkdir -p ~/worker"
+  ssh -i "${SSH_KEY}" root@${host} "mkdir -p ~/worker /var/lib/kubelet"
+
+  scp -i "${SSH_KEY}" \
+    "${HOME}/ca.crt" \
+    "root@${host}:/var/lib/kubelet/ca.crt"
+
+  scp -i "${SSH_KEY}" \
+    "${HOME}/${host}.crt" \
+    "root@${host}:/var/lib/kubelet/kubelet.crt"
+
+  scp -i "${SSH_KEY}" \
+    "${HOME}/${host}.key" \
+    "root@${host}:/var/lib/kubelet/kubelet.key"
+
+  scp -i "${SSH_KEY}" \
+    "${HOME}/${host}.kubeconfig" \
+    "root@${host}:/var/lib/kubelet/kubeconfig"
 
   for bin in "${WORKER_BINARIES[@]}"; do
     scp -i "${SSH_KEY}" \

@@ -1,105 +1,86 @@
-# Smoke Test
+# Smoke Test And KEDA Demo
 
-In this lab you will complete a series of tasks to ensure your Kubernetes cluster is functioning correctly.
+In this lab you deploy the Bookinfo sample application, install the autoscaling add-on needed for the demo, and run an expanded smoke test suite against the cluster.
 
-## Data Encryption
+Step 13 now verifies three things together:
 
-Create a generic secret:
+1. Core Kubernetes workflows still work: secrets, deployments, logs, exec, port-forwarding, NodePort, and DNS.
+2. Bookinfo remains reachable under wave-based traffic.
+3. Backend queue workers scale with KEDA based on Redis queue depth.
 
-```sh
-kubectl create secret generic kubernetes-the-hard-way --from-literal="mykey=mydata"
-```
+## Autoscaling Components
 
-Retrieve the raw secret from etcd (run this on controller-1):
+The demo installs and verifies:
 
-```sh
-ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1
+1. `keda` in the `keda` namespace for queue-depth autoscaling.
+2. Bookinfo Deployments in the `demo` namespace with:
+   - explicit CPU and memory requests
+   - topology spread constraints
+3. Redis plus `demo-worker` in the `demo` namespace.
+4. A traffic-generator Deployment that:
+   - sends wave-based HTTP traffic to `productpage`
+   - pushes randomized burst/cooldown waves of work items directly into Redis
 
-etcdctl --endpoints=http://127.0.0.1:2379 \
-  get /registry/secrets/default/kubernetes-the-hard-way | hexdump -C
-```
+The async demo intentionally avoids custom application images. Queue publishing is handled by the traffic generator, and the workers use a stock image with inline script logic to consume Redis jobs and spend bounded CPU on each message. The scale signal comes from queue depth, not kubelet CPU metrics.
 
-The output should include the `k8s:enc:aescbc:v1:key1` prefix, which indicates the data is encrypted at rest.
+## Run The Demo
 
-## Deployments
-
-Create a deployment for nginx:
-
-```sh
-kubectl create deployment nginx --image=nginx
-```
-
-List the pod created by the deployment:
+From your local machine, execute:
 
 ```sh
-kubectl get pods -l app=nginx
+bash scripts/13.sh
 ```
 
-## Port Forwarding
+That script copies the manifests and helper scripts to the jumpbox, then runs:
 
-Retrieve the name of the nginx pod:
+1. `enable_aggregation_layer_on_jumpbox.sh`
+2. `install_keda_on_jumpbox.sh`
+3. `deploy_bookinfo_on_jumpbox.sh`
+4. `smoke_test_on_jumpbox.sh`
+
+## What The Smoke Test Checks
+
+The smoke test still covers the classic cluster checks:
+
+1. data encryption at rest
+2. a basic nginx deployment
+3. port-forwarding
+4. logs and `kubectl exec`
+5. NodePort access
+6. DNS resolution from a pod
+7. Cilium and Hubble health
+
+It then adds autoscaling verification:
+
+1. `kubectl get scaledobject -n demo` shows `demo-worker` as `Ready`.
+2. `demo-worker` scales above zero as queue bursts build up.
+3. `demo-worker` later scales back down during idle cooldown windows.
+4. Demo pods spread across multiple worker nodes.
+
+## Useful Manual Commands
+
+If you want to watch the demo live from the jumpbox:
 
 ```sh
-POD_NAME=$(kubectl get pods -l app=nginx -o jsonpath="{.items[0].metadata.name}")
+kubectl -n demo get deploy demo-worker -w
 ```
-
-Forward port `8080` on the jumpbox to port `80` in the pod:
 
 ```sh
-kubectl port-forward ${POD_NAME} 8080:80
+kubectl -n demo get scaledobject -w
 ```
-
-In another terminal, verify the response:
 
 ```sh
-curl --head http://127.0.0.1:8080
+kubectl -n demo get hpa
 ```
-
-Stop the port-forwarding session when done.
-
-## Logs
-
-Print the nginx pod logs:
 
 ```sh
-kubectl logs ${POD_NAME}
+kubectl -n demo exec deploy/redis -- redis-cli LLEN demo-jobs
 ```
-
-## Exec
-
-Execute a command in the container:
 
 ```sh
-kubectl exec -ti ${POD_NAME} -- nginx -v
+kubectl -n demo get pods -o wide
 ```
 
-## Services
-
-Expose the nginx deployment with a NodePort:
-
-```sh
-kubectl expose deployment nginx --port 80 --type NodePort
-```
-
-Find the node port and the node hosting the nginx pod:
-
-```sh
-NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
-NODE_NAME=$(kubectl get pod ${POD_NAME} --output=jsonpath='{.spec.nodeName}')
-```
-
-Make an HTTP request through the worker hostname and node port:
-
-```sh
-curl -I http://${NODE_NAME}:${NODE_PORT}
-```
-
-## DNS Resolution
-
-Re-run the DNS lookup from the busybox pod:
-
-```sh
-kubectl exec -it busybox -- nslookup kubernetes.default.svc.cluster.local
-```
+If you also deployed the visualizer in step 14, Hubble-gazer should show the Bookinfo traffic waves and the Redis/worker activity changing as KEDA reacts to queue bursts and cooldowns.
 
 Next: [Optional: Hubble Gazer Visualizer](14-hubble-gazer-visualizer.md)

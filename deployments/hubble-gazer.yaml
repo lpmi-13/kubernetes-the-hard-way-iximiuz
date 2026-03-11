@@ -27,7 +27,7 @@ spec:
       serviceAccountName: hubble-gazer
       containers:
       - name: hubble-gazer
-        image: ghcr.io/lpmi-13/hubble-gazer:0.2.0
+        image: ghcr.io/lpmi-13/hubble-gazer:0.3.0
         ports:
         - containerPort: 3000
         env:

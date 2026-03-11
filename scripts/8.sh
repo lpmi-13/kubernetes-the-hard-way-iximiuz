@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | length == 1 and .[0].name == "jumpbox") | .id')
 
 labctl cp ./scripts/bootstrap_control_plane_on_controllers.sh $JUMPBOX_PLAYGROUND_ID:~/bootstrap_control_plane_on_controllers.sh
@@ -32,5 +33,4 @@ labctl ssh $JUMPBOX_PLAYGROUND_ID "scp -i ~/.ssh/kubernetes.ed25519 ~/configs/ku
 labctl ssh $JUMPBOX_PLAYGROUND_ID "scp -i ~/.ssh/kubernetes.ed25519 ~/set_up_rbac.sh root@controller-1:/root/set_up_rbac.sh"
 labctl ssh $JUMPBOX_PLAYGROUND_ID "ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 'bash /root/set_up_rbac.sh'"
 
-labctl ssh $JUMPBOX_PLAYGROUND_ID "ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 'kubectl get componentstatuses --kubeconfig /root/admin.kubeconfig'"
-labctl ssh $JUMPBOX_PLAYGROUND_ID "curl -k --cacert ~/ca.crt https://server.kubernetes.local:6443/version"
+bash "${REPO_ROOT}/scripts/check_control_plane.sh"
