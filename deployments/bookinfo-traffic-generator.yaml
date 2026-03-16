@@ -141,6 +141,7 @@ spec:
     metadata:
       labels:
         app: traffic-generator
+        kthw-demo-spread: shared
     spec:
       affinity:
         podAntiAffinity:
@@ -157,16 +158,16 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: traffic-generator
+            kthw-demo-spread: shared
       containers:
       - name: productpage-generator
-        image: curlimages/curl:8.12.1
+        image: ghcr.io/lpmi-13/curlimages-curl:8.12.1
         command:
         - /bin/sh
         - /scripts/productpage-wave.sh
         env:
         - name: BOOKINFO_URL
-          value: http://productpage.demo:9080/productpage
+          value: http://productpage:9080/productpage
         volumeMounts:
         - name: traffic-scripts
           mountPath: /scripts
@@ -179,7 +180,7 @@ spec:
             cpu: 250m
             memory: 256Mi
       - name: queue-generator
-        image: docker.io/library/redis:7.2-alpine
+        image: ghcr.io/lpmi-13/redis:7.2-alpine
         command:
         - /bin/sh
         - /scripts/queue-wave.sh

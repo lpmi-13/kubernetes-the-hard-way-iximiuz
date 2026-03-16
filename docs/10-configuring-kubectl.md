@@ -53,10 +53,6 @@ worker-2   Ready    <none>   10m     v1.32.3
 worker-3   Ready    <none>   8m14s   v1.32.3
 worker-4   Ready    <none>   7m44s   v1.32.3
 worker-5   Ready    <none>   7m13s   v1.32.3
-worker-6   Ready    <none>   6m45s   v1.32.3
-worker-7   Ready    <none>   6m21s   v1.32.3
-worker-8   Ready    <none>   5m52s   v1.32.3
-worker-9   Ready    <none>   5m23s   v1.32.3
 ```
 
 Next: [Deploying Cilium and Hubble](11-cilium-hubble.md)

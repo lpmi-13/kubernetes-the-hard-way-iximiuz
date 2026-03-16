@@ -54,8 +54,7 @@ Generate the certificates and private keys:
 certs=(
   "admin" "worker-1" "worker-2"
   "worker-3" "worker-4" "worker-5"
-  "worker-6" "worker-7" "worker-8"
-  "worker-9" "kube-scheduler"
+  "kube-scheduler"
   # we might need to do separate controller certs later
   "kube-controller-manager"
   "kube-api-server"
@@ -93,7 +92,7 @@ In this section you will copy the various certificates to every machine at a pat
 Copy the appropriate certificates and private keys to the `worker-*` machines:
 
 ```sh
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   ssh -i ~/.ssh/kubernetes.ed25519 laborant@${host} mkdir /var/lib/kubelet/
 
   scp -i ~/.ssh/kubernetes.ed25519 ca.crt laborant@${host}:/var/lib/kubelet/

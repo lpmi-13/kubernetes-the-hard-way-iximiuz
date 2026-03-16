@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HUBBLE_GAZER_VERSION="0.3.0"
+HUBBLE_GAZER_VERSION="0.5.0"
 HUBBLE_LOCAL_UI_PORT=8888
 HUBBLE_JUMPBOX_FORWARD_PORT=3000
 BOOKINFO_LOCAL_UI_PORT=5000
@@ -25,6 +25,37 @@ retry_cmd() {
   done
 }
 
+stop_local_listener_on_port() {
+  local local_port="$1"
+  local jumpbox_port="${2:-}"
+  local listener_pids=""
+
+  if [ -n "${jumpbox_port}" ] && command -v pgrep >/dev/null 2>&1; then
+    listener_pids="$(pgrep -f "labctl port-forward .* -L ${local_port}:${jumpbox_port}" || true)"
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    listener_pids="${listener_pids}"$'\n'"$(lsof -tiTCP:${local_port} -sTCP:LISTEN 2>/dev/null || true)"
+  fi
+
+  if [ -z "${listener_pids}" ] && command -v ss >/dev/null 2>&1; then
+    listener_pids="$(ss -ltnp "( sport = :${local_port} )" 2>/dev/null | awk -F'pid=' 'NR > 1 && NF > 1 {split($2, a, ","); print a[1]}' | sort -u || true)"
+  fi
+
+  listener_pids="$(printf '%s\n' "${listener_pids}" | awk 'NF {print}' | sort -u || true)"
+
+  if [ -z "${listener_pids}" ]; then
+    return 0
+  fi
+
+  while IFS= read -r pid; do
+    [ -n "${pid}" ] || continue
+    kill "${pid}" 2>/dev/null || true
+  done <<< "${listener_pids}"
+
+  sleep 1
+}
+
 ensure_local_port_forward() {
   local jumpbox_id="$1"
   local name="$2"
@@ -37,12 +68,19 @@ ensure_local_port_forward() {
     local existing_pid
     existing_pid="$(cat "${pid_file}" 2>/dev/null || true)"
     if [ -n "${existing_pid}" ] && kill -0 "${existing_pid}" 2>/dev/null; then
-      echo "${existing_pid}"
-      return 0
+      kill "${existing_pid}" 2>/dev/null || true
+      sleep 1
     fi
+    rm -f "${pid_file}"
   fi
 
-  nohup labctl port-forward "${jumpbox_id}" -L "${local_port}:${jumpbox_port}" >"${log_file}" 2>&1 < /dev/null &
+  stop_local_listener_on_port "${local_port}" "${jumpbox_port}"
+
+  if command -v setsid >/dev/null 2>&1; then
+    setsid labctl port-forward "${jumpbox_id}" -L "${local_port}:${jumpbox_port}" >"${log_file}" 2>&1 < /dev/null &
+  else
+    nohup labctl port-forward "${jumpbox_id}" -L "${local_port}:${jumpbox_port}" >"${log_file}" 2>&1 < /dev/null &
+  fi
   local pf_pid=$!
   echo "${pf_pid}" > "${pid_file}"
   sleep 1
@@ -72,9 +110,10 @@ log_file=/tmp/${name}-portforward.log
 if [ -f "\${pid_file}" ]; then
   existing_pid="\$(cat "\${pid_file}" 2>/dev/null || true)"
   if [ -n "\${existing_pid}" ] && kill -0 "\${existing_pid}" 2>/dev/null; then
-    echo "\${existing_pid}"
-    exit 0
+    kill "\${existing_pid}" 2>/dev/null || true
+    sleep 1
   fi
+  rm -f "\${pid_file}"
 fi
 
 nohup kubectl -n ${namespace} port-forward --address 0.0.0.0 svc/${service} ${local_port}:${target_port} >"\${log_file}" 2>&1 < /dev/null &

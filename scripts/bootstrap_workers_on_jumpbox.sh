@@ -9,7 +9,7 @@ WORKER_BINARIES=(
   kubelet
 )
 
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   echo "[worker] preparing ${host}"
 
   ssh -i "${SSH_KEY}" root@${host} "mkdir -p ~/worker /var/lib/kubelet"

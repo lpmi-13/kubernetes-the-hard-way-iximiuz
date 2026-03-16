@@ -95,7 +95,7 @@ metadata:
     k8s-app: kube-dns
     kubernetes.io/name: "CoreDNS"
 spec:
-  replicas: 1
+  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -113,6 +113,13 @@ spec:
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  k8s-app: kube-dns
+              topologyKey: kubernetes.io/hostname
       nodeSelector:
         kubernetes.io/os: linux
       containers:
@@ -208,6 +215,9 @@ Apply the manifest:
 kubectl apply -f ~/deployments/core-dns.yaml
 ```
 
+This manifest runs CoreDNS as a two-pod pair and requires the pods to land on
+different worker nodes.
+
 Wait for the rollout:
 
 ```sh
@@ -226,7 +236,7 @@ Create a temporary busybox pod on the same node as CoreDNS:
 
 ```sh
 COREDNS_NODE=$(kubectl -n kube-system get pod -l k8s-app=kube-dns -o jsonpath='{.items[0].spec.nodeName}')
-kubectl run busybox --image=busybox:1.28.4 --restart=Never \
+kubectl run busybox --image=ghcr.io/lpmi-13/busybox:1.28.4 --restart=Never \
   --overrides="{\"apiVersion\":\"v1\",\"spec\":{\"nodeName\":\"${COREDNS_NODE}\"}}" -- sleep 3600
 kubectl wait --for=condition=Ready pod/busybox --timeout=90s
 ```

@@ -4,26 +4,22 @@ for playground_id in $(labctl playground list -q); do
   labctl playground stop $playground_id
 done
 
-# Set up 3 worker clusters with sequential worker numbering (1-9)
-for i in {1..3}; do
-  # Calculate worker number range for this cluster
-  start_worker=$(( ($i - 1) * 3 + 1 ))
-  end_worker=$(( $start_worker + 2 ))
-
+# Set up 1 worker cluster with 5 workers
+for i in 1; do
   labctl playground start flexbox -f -<<EOF
     kind: playground
     name: worker-cluster-"${i}"
     title: Worker Cluster "$i"
-    description: Worker cluster "$i" (workers ${start_worker}-${end_worker}) for the k8s the hard way cluster of clusters
+    description: Worker cluster "$i" (workers 1-5) for the k8s the hard way cluster of clusters
     categories:
         - linux
         - kubernetes
     playground:
         networks:
             - name: local
-              subnet: "172.16.$i.0/24"
+              subnet: "172.16.1.0/24"
         machines:
-            - name: worker-${start_worker}
+            - name: worker-1
               users:
                 - name: root
                 - name: laborant
@@ -37,8 +33,8 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
-            - name: worker-$((start_worker+1))
+                ramSize: 2GiB
+            - name: worker-2
               users:
                 - name: root
                 - name: laborant
@@ -52,8 +48,8 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
-            - name: worker-${end_worker}
+                ramSize: 2GiB
+            - name: worker-3
               users:
                 - name: root
                 - name: laborant
@@ -67,20 +63,58 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
+                ramSize: 2GiB
+            - name: worker-4
+              users:
+                - name: root
+                - name: laborant
+                  default: true
+              drives:
+                - source: ubuntu-24-04
+                  mount: /
+                  size: 30GiB
+              network:
+                interfaces:
+                    - network: local
+              resources:
+                cpuCount: 2
+                ramSize: 2GiB
+            - name: worker-5
+              users:
+                - name: root
+                - name: laborant
+                  default: true
+              drives:
+                - source: ubuntu-24-04
+                  mount: /
+                  size: 30GiB
+              network:
+                interfaces:
+                    - network: local
+              resources:
+                cpuCount: 2
+                ramSize: 2GiB
         tabs:
-            - id: terminal-worker-${start_worker}
+            - id: terminal-worker-1
               kind: terminal
-              name: worker-${start_worker}
-              machine: worker-${start_worker}
-            - id: terminal-worker-$((start_worker+1))
+              name: worker-1
+              machine: worker-1
+            - id: terminal-worker-2
               kind: terminal
-              name: worker-$((start_worker+1))
-              machine: worker-$((start_worker+1))
-            - id: terminal-worker-${end_worker}
+              name: worker-2
+              machine: worker-2
+            - id: terminal-worker-3
               kind: terminal
-              name: worker-${end_worker}
-              machine: worker-${end_worker}
+              name: worker-3
+              machine: worker-3
+            - id: terminal-worker-4
+              kind: terminal
+              name: worker-4
+              machine: worker-4
+            - id: terminal-worker-5
+              kind: terminal
+              name: worker-5
+              machine: worker-5
         accessControl:
             canList:
                 - anyone

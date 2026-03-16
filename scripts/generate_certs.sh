@@ -15,8 +15,7 @@ openssl req -x509 -new -sha512 -noenc \
 certs=(
   "admin" "worker-1" "worker-2"
   "worker-3" "worker-4" "worker-5"
-  "worker-6" "worker-7" "worker-8"
-  "worker-9" "kube-scheduler"
+  "kube-scheduler"
   # we might need to do separate controller certs later
   "kube-controller-manager"
   "kube-api-server" "service-accounts"
@@ -52,7 +51,7 @@ openssl x509 -req -days 3653 -in "front-proxy-client.csr" \
 
 rm -f "front-proxy-client.csr"
 
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   ssh -i ~/.ssh/kubernetes.ed25519 root@${host} "mkdir -p /var/lib/kubelet/"
 
   scp -i ~/.ssh/kubernetes.ed25519 ca.crt root@${host}:/var/lib/kubelet/

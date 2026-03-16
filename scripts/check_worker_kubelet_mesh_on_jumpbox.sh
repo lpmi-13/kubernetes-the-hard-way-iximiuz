@@ -5,14 +5,20 @@ SSH_KEY="${SSH_KEY:-$HOME/.ssh/kubernetes.ed25519}"
 
 worker_cluster_index_for_name() {
   local worker_name="$1"
-  local worker_number="${worker_name#worker-}"
-
-  printf '%d\n' "$(( ((worker_number - 1) / 3) + 1 ))"
+  case "${worker_name}" in
+    worker-[1-5])
+      printf '1\n'
+      ;;
+    *)
+      echo "unsupported worker name: ${worker_name}" >&2
+      return 1
+      ;;
+  esac
 }
 
 TARGET_HOSTS=("$@")
 if [ "${#TARGET_HOSTS[@]}" -eq 0 ]; then
-  TARGET_HOSTS=(worker-{1..9})
+  TARGET_HOSTS=(worker-{1..5})
 fi
 
 declare -A WORKER_IPS=()

@@ -107,7 +107,7 @@ printf '%s %s\n' "${LOAD_BALANCER_IP}" "server.kubernetes.local" | sudo tee -a /
 Update `/etc/hosts` on all nodes:
 
 ```sh
-for host in controller-{1..3} worker-{1..9} load-balancer; do
+for host in controller-{1..3} worker-{1..5} load-balancer; do
   ssh -i ~/.ssh/kubernetes.ed25519 root@${host} \
     "sed -i '/[[:space:]]server.kubernetes.local$/d' /etc/hosts; \
      printf '%s %s\n' '${LOAD_BALANCER_IP}' 'server.kubernetes.local' >> /etc/hosts"

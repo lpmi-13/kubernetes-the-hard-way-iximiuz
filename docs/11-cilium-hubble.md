@@ -42,7 +42,21 @@ By setting `--node-ip` to the Tailscale address, the Kubernetes node object adve
 ## Install Cilium CLI and Helm
 
 ```bash
-bash ~/install_cilium_tools_on_jumpbox.sh
+CILIUM_CLI_VERSION="v0.19.2"
+HELM_VERSION="v3.17.0"
+
+if [ ! -f /usr/local/bin/cilium ]; then
+  curl -sL "https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" \
+    | tar xz -C /usr/local/bin
+fi
+
+if [ ! -f /usr/local/bin/helm ]; then
+  curl -sL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+    | tar xz --strip-components=1 -C /usr/local/bin linux-amd64/helm
+fi
+
+cilium version --client
+helm version --short
 ```
 
 This installs:
@@ -52,7 +66,45 @@ This installs:
 ## Deploy Cilium
 
 ```bash
-bash ~/deploy_cilium_on_jumpbox.sh
+CILIUM_VERSION="1.16.5"
+
+node_output="$(kubectl get nodes 2>/dev/null || true)"
+worker_count="$(printf '%s\n' "${node_output}" | awk '$1 ~ /^worker-/ {count++} END {print count+0}')"
+if [ "${worker_count}" -lt 9 ]; then
+  echo "expected 9 registered worker nodes before install, found ${worker_count}" >&2
+  printf '%s\n' "${node_output}" >&2
+  exit 1
+fi
+
+helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
+helm repo update cilium
+
+helm template cilium cilium/cilium \
+  --version "${CILIUM_VERSION}" \
+  --namespace kube-system \
+  --set kubeProxyReplacement=true \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan \
+  --set k8sServiceHost=server.kubernetes.local \
+  --set k8sServicePort=6443 \
+  --set hubble.enabled=true \
+  --set hubble.relay.enabled=true \
+  --set hubble.relay.extraEnv[0].name=GOPS_CONFIG_DIR \
+  --set hubble.relay.extraEnv[0].value=/tmp \
+  --set hubble.ui.enabled=true \
+  --set 'hubble.metrics.enabled={dns,drop,tcp,flow,httpV2:exemplars=true;labelsContext=source_namespace\,destination_namespace\,source_pod\,destination_pod}' \
+  --set operator.replicas=1 \
+  --set ipam.mode=cluster-pool \
+  --set ipam.operator.clusterPoolIPv4PodCIDRList='{10.200.0.0/16}' \
+  --set ipam.operator.clusterPoolIPv4MaskSize=24 \
+  > /tmp/cilium-manifests.yaml
+
+kubectl apply -f /tmp/cilium-manifests.yaml
+
+kubectl -n kube-system rollout status daemonset/cilium --timeout=300s
+kubectl -n kube-system rollout status deployment/cilium-operator --timeout=300s
+
+cilium status --wait=false || true
 ```
 
 This uses `helm template` to render Cilium manifests with these key settings, then applies them with `kubectl apply`:
@@ -129,8 +181,8 @@ Hubble Relay aggregates flow data from all agents and exposes a single gRPC endp
 
 ## Consuming Hubble data
 
-Hubble Relay exposes a gRPC API via the `hubble-relay` Kubernetes Service at `hubble-relay.kube-system.svc.cluster.local:80` (forwarded to relay pod port `4245`). Any in-cluster workload (or port-forwarded client) can subscribe to this stream to receive real-time network flow events.
+Hubble Relay exposes its gRPC stream on pod port `4245`. In this tutorial, the optional `hubble-gazer` add-on creates a dedicated in-cluster wrapper Service named `hubble-relay-grpc` at `hubble-relay-grpc.kube-system.svc.cluster.local:4245` so consumers can connect to Relay on its native gRPC port.
 
-The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a compatible consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. In this tutorial it is deployed as an optional add-on in step 14 using release `0.3.0`.
+The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a compatible consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. In this tutorial it is deployed as an optional add-on in step 14 using release `0.5.0`.
 
 Next: [Deploying the DNS Cluster Add-on](12-dns-addon.md)

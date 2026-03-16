@@ -24,11 +24,13 @@ TS_TAGS="${TS_TAGS:-tag:kthw}"
 
 worker_names_for_cluster() {
   local cluster_index="$1"
-  local start_worker=$(( (cluster_index - 1) * 3 + 1 ))
 
-  printf 'worker-%d\n' "${start_worker}"
-  printf 'worker-%d\n' "$((start_worker + 1))"
-  printf 'worker-%d\n' "$((start_worker + 2))"
+  if [ "${cluster_index}" -ne 1 ]; then
+    echo "unsupported worker cluster index: ${cluster_index}" >&2
+    return 1
+  fi
+
+  printf 'worker-%d\n' 1 2 3 4 5
 }
 
 wait_for_running_machines() {
@@ -201,24 +203,27 @@ delete_tailscale_devices_matching_hosts() {
 
 start_worker_playground() {
   local cluster_index="$1"
-  local start_worker=$(( (cluster_index - 1) * 3 + 1 ))
-  local end_worker=$((start_worker + 2))
+
+  if [ "${cluster_index}" -ne 1 ]; then
+    echo "unsupported worker cluster index: ${cluster_index}" >&2
+    return 1
+  fi
 
   echo "starting worker cluster ${cluster_index}..."
   labctl playground start flexbox -f -<<EOF
     kind: playground
     name: worker-cluster-"${cluster_index}"
     title: Worker Cluster "${cluster_index}"
-    description: Worker cluster "${cluster_index}" (workers ${start_worker}-${end_worker}) for the k8s the hard way cluster of clusters
+    description: Worker cluster "${cluster_index}" (workers 1-5) for the k8s the hard way cluster of clusters
     categories:
         - linux
         - kubernetes
     playground:
         networks:
             - name: local
-              subnet: "172.16.${cluster_index}.0/24"
+              subnet: "172.16.1.0/24"
         machines:
-            - name: worker-${start_worker}
+            - name: worker-1
               users:
                 - name: root
                   default: true
@@ -231,8 +236,8 @@ start_worker_playground() {
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
-            - name: worker-$((start_worker + 1))
+                ramSize: 2GiB
+            - name: worker-2
               users:
                 - name: root
                   default: true
@@ -245,8 +250,8 @@ start_worker_playground() {
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
-            - name: worker-${end_worker}
+                ramSize: 2GiB
+            - name: worker-3
               users:
                 - name: root
                   default: true
@@ -259,20 +264,56 @@ start_worker_playground() {
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
+                ramSize: 2GiB
+            - name: worker-4
+              users:
+                - name: root
+                  default: true
+              drives:
+                - source: ubuntu-24-04
+                  mount: /
+                  size: 30GiB
+              network:
+                interfaces:
+                    - network: local
+              resources:
+                cpuCount: 2
+                ramSize: 2GiB
+            - name: worker-5
+              users:
+                - name: root
+                  default: true
+              drives:
+                - source: ubuntu-24-04
+                  mount: /
+                  size: 30GiB
+              network:
+                interfaces:
+                    - network: local
+              resources:
+                cpuCount: 2
+                ramSize: 2GiB
         tabs:
-            - id: terminal-worker-${start_worker}
+            - id: terminal-worker-1
               kind: terminal
-              name: worker-${start_worker}
-              machine: worker-${start_worker}
-            - id: terminal-worker-$((start_worker + 1))
+              name: worker-1
+              machine: worker-1
+            - id: terminal-worker-2
               kind: terminal
-              name: worker-$((start_worker + 1))
-              machine: worker-$((start_worker + 1))
-            - id: terminal-worker-${end_worker}
+              name: worker-2
+              machine: worker-2
+            - id: terminal-worker-3
               kind: terminal
-              name: worker-${end_worker}
-              machine: worker-${end_worker}
+              name: worker-3
+              machine: worker-3
+            - id: terminal-worker-4
+              kind: terminal
+              name: worker-4
+              machine: worker-4
+            - id: terminal-worker-5
+              kind: terminal
+              name: worker-5
+              machine: worker-5
         accessControl:
             canList:
                 - anyone

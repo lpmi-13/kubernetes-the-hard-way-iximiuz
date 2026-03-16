@@ -18,6 +18,6 @@ Install a current Go release before running the commands in `docs/02-compute-res
 Because we accomplish all the cool networking bits via tailscale magic, you'll need a Tailscale account and a tailnet OAuth client with:
 
 - `auth_keys` permissions (for provisioning one-off auth keys)
-- `devices:core` permissions (for cleanup of stale devices in `clean-up.sh`)
+- `devices:core` permissions (for cleanup of stale devices during teardown)
 
 Go ahead and sign up [here](https://tailscale.com/) if you don't already have an account.

@@ -15,7 +15,7 @@ When generating kubeconfig files for Kubelets the client certificate matching th
 Generate a kubeconfig file for the worker nodes:
 
 ```bash
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.crt \
     --embed-certs=true \
@@ -46,10 +46,6 @@ worker-2.kubeconfig
 worker-3.kubeconfig
 worker-4.kubeconfig
 worker-5.kubeconfig
-worker-6.kubeconfig
-worker-7.kubeconfig
-worker-8.kubeconfig
-worker-9.kubeconfig
 ```
 
 ### The kube-controller-manager Kubernetes Configuration File
@@ -160,7 +156,7 @@ admin.kubeconfig
 Copy the `kubelet` kubeconfig files to the `worker-*` machines:
 
 ```bash
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   ssh -i ~/.ssh/kubernetes.ed25519 root@${host} "mkdir -p /var/lib/kubelet"
 
   scp -i ~/.ssh/kubernetes.ed25519 ${host}.kubeconfig \

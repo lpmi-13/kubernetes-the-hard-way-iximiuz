@@ -4,7 +4,7 @@ set -euo pipefail
 CILIUM_VERSION="1.16.5"
 
 require_worker_nodes() {
-  local expected="${1:-9}"
+  local expected="${1:-5}"
   local node_output worker_count
 
   node_output="$(kubectl get nodes 2>/dev/null || true)"
@@ -17,7 +17,7 @@ require_worker_nodes() {
   fi
 }
 
-require_worker_nodes 9
+require_worker_nodes 5
 
 echo "[cilium] adding Cilium Helm repository"
 helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true

@@ -1,6 +1,6 @@
 # Bootstrapping the Kubernetes Worker Nodes
 
-In this lab you will bootstrap nine Kubernetes worker nodes across 3 playgrounds. The following components will be installed on each node: containerd and kubelet. CNI networking and service proxy functionality are handled by Cilium (deployed in step 11).
+In this lab you will bootstrap five Kubernetes worker nodes in a single worker playground. The following components will be installed on each node: containerd and kubelet. CNI networking and service proxy functionality are handled by Cilium (deployed in step 11).
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ The commands in this lab are run from the jumpbox unless otherwise noted.
 From the jumpbox, copy the worker binaries to each worker:
 
 ```sh
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   scp -i ~/.ssh/kubernetes.ed25519 -r \
     ~/downloads/worker \
     root@${host}:~/
@@ -205,7 +205,7 @@ systemctl start containerd kubelet
 
 > **Note**: Nodes will appear as `NotReady` until Cilium is deployed in step 11, which installs the CNI plugin.
 
-Repeat the worker setup on all nine workers.
+Repeat the worker setup on all five workers.
 
 ## Verification
 

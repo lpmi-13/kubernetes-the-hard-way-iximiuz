@@ -42,4 +42,4 @@ kubectl config use-context kubernetes-the-hard-way --kubeconfig=admin.kubeconfig
 mkdir -p ~/.kube
 cp admin.kubeconfig ~/.kube/config
 
-wait_for_worker_nodes 9
+wait_for_worker_nodes 5

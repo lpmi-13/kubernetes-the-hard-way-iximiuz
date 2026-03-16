@@ -19,7 +19,10 @@ retry_cmd() {
   done
 }
 
-JUMPBOX_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | select(.machines | length == 1 and .[0].name == "jumpbox") | .id')
+JUMPBOX_PLAYGROUND_ID="$(
+  labctl playground list -o json \
+    | jq -r '(. // [])[]? | select((.machines // [] | length == 1) and (.machines[0].name == "jumpbox")) | .id'
+)"
 if [ -z "${JUMPBOX_PLAYGROUND_ID}" ] || [ "${JUMPBOX_PLAYGROUND_ID}" = "null" ]; then
   echo "failed to find jumpbox playground id" >&2
   exit 1

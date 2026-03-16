@@ -5,7 +5,50 @@ metadata:
   namespace: kube-system
   labels:
     app: hubble-gazer
-automountServiceAccountToken: false
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hubble-gazer
+  labels:
+    app: hubble-gazer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hubble-gazer
+  labels:
+    app: hubble-gazer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hubble-gazer
+subjects:
+- kind: ServiceAccount
+  name: hubble-gazer
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-relay-grpc
+  namespace: kube-system
+  labels:
+    app: hubble-gazer
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4245
+    targetPort: grpc
+    protocol: TCP
+    name: grpc
+  selector:
+    k8s-app: hubble-relay
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -27,12 +70,12 @@ spec:
       serviceAccountName: hubble-gazer
       containers:
       - name: hubble-gazer
-        image: ghcr.io/lpmi-13/hubble-gazer:0.3.0
+        image: ghcr.io/lpmi-13/hubble-gazer:0.5.0
         ports:
         - containerPort: 3000
         env:
         - name: HUBBLE_RELAY_ADDR
-          value: hubble-relay.kube-system.svc.cluster.local:80
+          value: hubble-relay-grpc.kube-system.svc.cluster.local:4245
         - name: LISTEN_ADDR
           value: ":3000"
         resources:

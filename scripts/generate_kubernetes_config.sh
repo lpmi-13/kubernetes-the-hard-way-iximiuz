@@ -1,6 +1,6 @@
 set -euo pipefail
 
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.crt \
     --embed-certs=true \
@@ -83,7 +83,7 @@ kubectl config set-context default \
 kubectl config use-context default \
   --kubeconfig=admin.kubeconfig
 
-for host in worker-{1..9}; do
+for host in worker-{1..5}; do
   ssh -i ~/.ssh/kubernetes.ed25519 root@${host} "mkdir -p /var/lib/kubelet"
 
   scp -i ~/.ssh/kubernetes.ed25519 ${host}.kubeconfig \

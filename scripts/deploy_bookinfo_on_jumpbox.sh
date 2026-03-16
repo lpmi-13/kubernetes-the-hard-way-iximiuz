@@ -13,6 +13,9 @@ wait_for_scaledobject_ready() {
     sleep 10
   done
 
+  echo "[bookinfo] ScaledObject/${name} did not become Ready in time" >&2
+  kubectl -n "${namespace}" describe scaledobject "${name}" >&2 || true
+  kubectl -n keda get pods -o wide >&2 || true
   return 1
 }
 

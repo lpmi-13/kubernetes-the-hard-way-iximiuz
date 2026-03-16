@@ -3,6 +3,8 @@ kind: Namespace
 metadata:
   name: demo
 ---
+# Keep the static Bookinfo layer intentionally small so Hubble-gazer stays
+# readable and the queue worker scale-out is visually obvious.
 # Productpage
 apiVersion: apps/v1
 kind: Deployment
@@ -22,6 +24,7 @@ spec:
     metadata:
       labels:
         app: productpage
+        kthw-demo-spread: shared
         version: v1
     spec:
       affinity:
@@ -39,10 +42,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: productpage
+            kthw-demo-spread: shared
       containers:
       - name: productpage
-        image: docker.io/istio/examples-bookinfo-productpage-v1:1.20.2
+        image: ghcr.io/lpmi-13/istio-examples-bookinfo-productpage-v1:1.20.2
         ports:
         - containerPort: 9080
         readinessProbe:
@@ -85,7 +88,7 @@ metadata:
     app: details
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: details
@@ -94,6 +97,7 @@ spec:
     metadata:
       labels:
         app: details
+        kthw-demo-spread: shared
         version: v1
     spec:
       affinity:
@@ -111,10 +115,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: details
+            kthw-demo-spread: shared
       containers:
       - name: details
-        image: docker.io/istio/examples-bookinfo-details-v1:1.20.2
+        image: ghcr.io/lpmi-13/istio-examples-bookinfo-details-v1:1.20.2
         ports:
         - containerPort: 9080
         readinessProbe:
@@ -156,7 +160,7 @@ metadata:
     app: ratings
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ratings
@@ -165,6 +169,7 @@ spec:
     metadata:
       labels:
         app: ratings
+        kthw-demo-spread: shared
         version: v1
     spec:
       affinity:
@@ -182,10 +187,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: ratings
+            kthw-demo-spread: shared
       containers:
       - name: ratings
-        image: docker.io/istio/examples-bookinfo-ratings-v1:1.20.2
+        image: ghcr.io/lpmi-13/istio-examples-bookinfo-ratings-v1:1.20.2
         ports:
         - containerPort: 9080
         readinessProbe:
@@ -227,7 +232,7 @@ metadata:
     app: reviews
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: reviews
@@ -236,6 +241,7 @@ spec:
     metadata:
       labels:
         app: reviews
+        kthw-demo-spread: shared
         version: v1
     spec:
       affinity:
@@ -253,10 +259,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: reviews
+            kthw-demo-spread: shared
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v1:1.20.2
+        image: ghcr.io/lpmi-13/istio-examples-bookinfo-reviews-v1:1.20.2
         ports:
         - containerPort: 9080
         readinessProbe:
@@ -283,7 +289,7 @@ metadata:
     app: reviews
     version: v2
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: reviews
@@ -292,6 +298,7 @@ spec:
     metadata:
       labels:
         app: reviews
+        kthw-demo-spread: shared
         version: v2
     spec:
       affinity:
@@ -309,10 +316,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: reviews
+            kthw-demo-spread: shared
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v2:1.20.2
+        image: ghcr.io/lpmi-13/istio-examples-bookinfo-reviews-v2:1.20.2
         ports:
         - containerPort: 9080
         readinessProbe:
@@ -339,7 +346,7 @@ metadata:
     app: reviews
     version: v3
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: reviews
@@ -348,6 +355,7 @@ spec:
     metadata:
       labels:
         app: reviews
+        kthw-demo-spread: shared
         version: v3
     spec:
       affinity:
@@ -365,10 +373,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: reviews
+            kthw-demo-spread: shared
       containers:
       - name: reviews
-        image: docker.io/istio/examples-bookinfo-reviews-v3:1.20.2
+        image: ghcr.io/lpmi-13/istio-examples-bookinfo-reviews-v3:1.20.2
         ports:
         - containerPort: 9080
         readinessProbe:

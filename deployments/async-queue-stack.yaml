@@ -73,10 +73,18 @@ spec:
     metadata:
       labels:
         app: redis
+        kthw-demo-spread: shared
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            kthw-demo-spread: shared
       containers:
       - name: redis
-        image: docker.io/library/redis:7.2-alpine
+        image: ghcr.io/lpmi-13/redis:7.2-alpine
         args:
         - redis-server
         - --save
@@ -135,6 +143,7 @@ spec:
     metadata:
       labels:
         app: demo-worker
+        kthw-demo-spread: shared
     spec:
       affinity:
         podAntiAffinity:
@@ -151,10 +160,10 @@ spec:
         whenUnsatisfiable: ScheduleAnyway
         labelSelector:
           matchLabels:
-            app: demo-worker
+            kthw-demo-spread: shared
       containers:
       - name: worker
-        image: docker.io/library/redis:7.2-alpine
+        image: ghcr.io/lpmi-13/redis:7.2-alpine
         command:
         - /bin/sh
         - /scripts/worker.sh

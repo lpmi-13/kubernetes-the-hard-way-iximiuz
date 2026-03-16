@@ -5,6 +5,13 @@ CONTROL_PLANE_PLAYGROUND_ID="$(labctl playground list -o json | jq -r '.[] | sel
 JUMPBOX_PLAYGROUND_ID="$(labctl playground list -o json | jq -r '.[] | select((.machines | length == 1) and (.machines[0].name == "jumpbox")) | .id')"
 failures=0
 
+run_remote() {
+  local playground_id="$1"
+  shift
+
+  timeout 20 labctl ssh "${playground_id}" "$@"
+}
+
 if [ -z "${CONTROL_PLANE_PLAYGROUND_ID}" ] || [ "${CONTROL_PLANE_PLAYGROUND_ID}" = "null" ]; then
   echo "failed to find control-plane playground id" >&2
   exit 1
@@ -19,13 +26,13 @@ check_service() {
   local machine="$1"
   local service="$2"
 
-  if labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine "${machine}" "systemctl is-active --quiet ${service}"; then
+  if run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine "${machine}" "[ \"\$(systemctl is-active ${service})\" = active ] && echo ${service}_ok"; then
     return 0
   fi
 
   echo "${machine}: ${service} is not active" >&2
-  labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine "${machine}" "systemctl status ${service} --no-pager -l || true" >&2 || true
-  labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine "${machine}" "journalctl -u ${service} --no-pager -n 80 || true" >&2 || true
+  run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine "${machine}" "systemctl status ${service} --no-pager -l || true" >&2 || true
+  run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine "${machine}" "journalctl -u ${service} --no-pager -n 80 || true" >&2 || true
   failures=$((failures + 1))
 }
 
@@ -37,21 +44,21 @@ done
 
 check_service load-balancer haproxy
 
-if ! labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine load-balancer "ss -ltn | grep -q ':6443'"; then
+if ! run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine load-balancer "ss -ltn | grep -q ':6443' && echo haproxy_port_ok"; then
   echo "load-balancer: nothing is listening on :6443" >&2
-  labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine load-balancer "ss -ltn || true" >&2 || true
+  run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine load-balancer "ss -ltn || true" >&2 || true
   failures=$((failures + 1))
 fi
 
-if ! labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine controller-1 "kubectl get --raw='/readyz' --kubeconfig /root/admin.kubeconfig >/dev/null"; then
+if ! run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine controller-1 "kubectl get --raw='/readyz' --kubeconfig /root/admin.kubeconfig >/dev/null && echo apiserver_ready"; then
   echo "controller-1: API server is not ready via admin.kubeconfig" >&2
-  labctl ssh "${CONTROL_PLANE_PLAYGROUND_ID}" --machine controller-1 "kubectl get --raw='/readyz?verbose' --kubeconfig /root/admin.kubeconfig || true" >&2 || true
+  run_remote "${CONTROL_PLANE_PLAYGROUND_ID}" --machine controller-1 "kubectl get --raw='/readyz?verbose' --kubeconfig /root/admin.kubeconfig || true" >&2 || true
   failures=$((failures + 1))
 fi
 
-if ! labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "curl -skf --connect-timeout 5 --cacert ~/ca.crt https://server.kubernetes.local:6443/version >/dev/null"; then
+if ! run_remote "${JUMPBOX_PLAYGROUND_ID}" "curl -skf --connect-timeout 5 --cacert ~/ca.crt https://server.kubernetes.local:6443/version >/dev/null && echo jumpbox_api_ok"; then
   echo "jumpbox: API endpoint server.kubernetes.local:6443 is not reachable" >&2
-  labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "getent hosts server.kubernetes.local || true; curl -sk --connect-timeout 5 --cacert ~/ca.crt https://server.kubernetes.local:6443/version || true" >&2 || true
+  run_remote "${JUMPBOX_PLAYGROUND_ID}" "getent hosts server.kubernetes.local || true; curl -sk --connect-timeout 5 --cacert ~/ca.crt https://server.kubernetes.local:6443/version || true" >&2 || true
   failures=$((failures + 1))
 fi
 

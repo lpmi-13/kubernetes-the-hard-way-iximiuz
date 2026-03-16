@@ -1,9 +1,11 @@
 # Optional: Hubble Gazer Visualizer
 
-In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.3.0`, a web UI that consumes Hubble Relay flow data and renders a live service traffic graph in your browser.
+In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.5.0`, a web UI that consumes Hubble Relay flow data and renders a live service traffic graph in your browser.
 
-This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay.kube-system.svc.cluster.local:80` (the relay Service port in this cluster).
-The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.3.0`.
+This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay-grpc.kube-system.svc.cluster.local:4245`.
+The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.5.0`.
+
+Step 13 now keeps the demo namespace intentionally compact, with a 9-pod static baseline and an 18-pod ceiling during worker scale-out, so the graph is easier to read.
 
 ## Prerequisites
 
@@ -88,6 +90,33 @@ Open:
 
 ```txt
 http://localhost:8888
+```
+
+## Trigger Live Scaling From Your Local Machine
+
+With Hubble-gazer open, you can scale the Bookinfo traffic generator without
+opening an interactive shell on the jumpbox:
+
+```sh
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" '
+set -euo pipefail
+kubectl -n demo scale deployment/traffic-generator --replicas=3
+kubectl -n demo rollout status deployment/traffic-generator --timeout=300s
+kubectl -n demo get deployment/traffic-generator
+kubectl -n demo get pods -l app=traffic-generator -o wide
+'
+```
+
+Scale it back down later:
+
+```sh
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" '
+set -euo pipefail
+kubectl -n demo scale deployment/traffic-generator --replicas=1
+kubectl -n demo rollout status deployment/traffic-generator --timeout=300s
+kubectl -n demo get deployment/traffic-generator
+kubectl -n demo get pods -l app=traffic-generator -o wide
+'
 ```
 
 ## Stop background forwards later

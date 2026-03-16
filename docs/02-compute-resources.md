@@ -6,28 +6,24 @@ Since everything is going to be on the remote system, we can just use `labctl` t
 
 ## Setting up the worker and controller nodes
 
-We're going to have 3 different clusters of worker nodes, each with 3 worker node machines. So in total, we'll have 9 worker nodes spread across 3 different subnets.
+We're going to have 1 worker playground with 5 worker node machines. So in total, we'll have 5 worker nodes sharing a single worker subnet.
 
 ```sh
-for i in {1..3}; do
-  # Calculate worker number range for this cluster
-  start_worker=$(( ($i - 1) * 3 + 1 ))
-  end_worker=$(( $start_worker + 2 ))
-
+for i in 1; do
   labctl playground start flexbox -f -<<EOF
     kind: playground
     name: worker-cluster-"${i}"
     title: Worker Cluster "$i"
-    description: Worker cluster "$i" (workers ${start_worker}-${end_worker}) for the k8s the hard way cluster of clusters
+    description: Worker cluster "$i" (workers 1-5) for the k8s the hard way cluster of clusters
     categories:
         - linux
         - kubernetes
     playground:
         networks:
             - name: local
-              subnet: "172.16.$i.0/24"
+              subnet: "172.16.1.0/24"
         machines:
-            - name: worker-${start_worker}
+            - name: worker-1
               users:
                 - name: root
                 - name: laborant
@@ -41,8 +37,8 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
-            - name: worker-$((start_worker+1))
+                ramSize: 2GiB
+            - name: worker-2
               users:
                 - name: root
                 - name: laborant
@@ -56,8 +52,8 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
-            - name: worker-${end_worker}
+                ramSize: 2GiB
+            - name: worker-3
               users:
                 - name: root
                 - name: laborant
@@ -71,20 +67,58 @@ for i in {1..3}; do
                     - network: local
               resources:
                 cpuCount: 2
-                ramSize: 4GiB
+                ramSize: 2GiB
+            - name: worker-4
+              users:
+                - name: root
+                - name: laborant
+                  default: true
+              drives:
+                - source: ubuntu-24-04
+                  mount: /
+                  size: 30GiB
+              network:
+                interfaces:
+                    - network: local
+              resources:
+                cpuCount: 2
+                ramSize: 2GiB
+            - name: worker-5
+              users:
+                - name: root
+                - name: laborant
+                  default: true
+              drives:
+                - source: ubuntu-24-04
+                  mount: /
+                  size: 30GiB
+              network:
+                interfaces:
+                    - network: local
+              resources:
+                cpuCount: 2
+                ramSize: 2GiB
         tabs:
-            - id: terminal-worker-${start_worker}
+            - id: terminal-worker-1
               kind: terminal
-              name: worker-${start_worker}
-              machine: worker-${start_worker}
-            - id: terminal-worker-$((start_worker+1))
+              name: worker-1
+              machine: worker-1
+            - id: terminal-worker-2
               kind: terminal
-              name: worker-$((start_worker+1))
-              machine: worker-$((start_worker+1))
-            - id: terminal-worker-${end_worker}
+              name: worker-2
+              machine: worker-2
+            - id: terminal-worker-3
               kind: terminal
-              name: worker-${end_worker}
-              machine: worker-${end_worker}
+              name: worker-3
+              machine: worker-3
+            - id: terminal-worker-4
+              kind: terminal
+              name: worker-4
+              machine: worker-4
+            - id: terminal-worker-5
+              kind: terminal
+              name: worker-5
+              machine: worker-5
         accessControl:
             canList:
                 - anyone
@@ -260,20 +294,80 @@ source .env
 
 ### Install and enroll all machines
 
-This runs locally, generates one-off keys via OAuth, and joins each VM to the tailnet.
+This runs locally, generates one-off keys via OAuth, and joins each VM to the
+tailnet.
 
 ```sh
-bash scripts/provision_tailscale_oauth_oneoff.sh
-```
+bash <<'EOF'
+set -euo pipefail
 
-Useful options:
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo "Missing required command: $1" >&2; exit 1; }
+}
 
-```sh
-# Show what would be enrolled without making changes
-bash scripts/provision_tailscale_oauth_oneoff.sh --dry-run
+require_cmd labctl
+require_cmd go
+require_cmd jq
 
-# Enroll only a subset of machines
-bash scripts/provision_tailscale_oauth_oneoff.sh --only 'worker-*'
+: "${TS_API_CLIENT_ID:?TS_API_CLIENT_ID must be set}"
+: "${TS_API_CLIENT_SECRET:?TS_API_CLIENT_SECRET must be set}"
+
+TS_TAGS="${TS_TAGS:-tag:kthw}"
+TS_GO_CACHE_ROOT="${TS_GO_CACHE_ROOT:-/tmp/kthw-go}"
+mkdir -p "${TS_GO_CACHE_ROOT}/gopath/pkg/mod" "${TS_GO_CACHE_ROOT}/gocache"
+
+generate_auth_key() {
+  GOPATH="${TS_GO_CACHE_ROOT}/gopath" \
+  GOMODCACHE="${TS_GO_CACHE_ROOT}/gopath/pkg/mod" \
+  GOCACHE="${TS_GO_CACHE_ROOT}/gocache" \
+  go run tailscale.com/cmd/get-authkey@latest -ephemeral -preauth -tags "${TS_TAGS}" | tr -d '[:space:]'
+}
+
+while IFS=$'\t' read -r playground_id machine_name; do
+  [ -n "${playground_id}" ] || continue
+  [ -n "${machine_name}" ] || continue
+
+  auth_key="$(generate_auth_key)"
+
+  labctl ssh "${playground_id}" --machine "${machine_name}" \
+    "TAILSCALE_AUTH_KEY='${auth_key}' TAILSCALE_HOSTNAME='${machine_name}' TAILSCALE_TAGS='${TS_TAGS}' sh -s" <<'REMOTE'
+set -eu
+
+if [ -z "${TAILSCALE_AUTH_KEY:-}" ]; then
+  echo "TAILSCALE_AUTH_KEY must be set" >&2
+  exit 1
+fi
+
+if [ -z "${TAILSCALE_HOSTNAME:-}" ]; then
+  TAILSCALE_HOSTNAME="$(hostname)"
+fi
+
+if [ -z "${TAILSCALE_TAGS:-}" ]; then
+  TAILSCALE_TAGS="tag:kthw"
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
+if ! command -v tailscale >/dev/null 2>&1; then
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+
+$SUDO systemctl enable --now tailscaled
+$SUDO tailscale up \
+  --auth-key="${TAILSCALE_AUTH_KEY}" \
+  --hostname="${TAILSCALE_HOSTNAME}" \
+  --advertise-tags="${TAILSCALE_TAGS}"
+$SUDO tailscale status >/dev/null
+REMOTE
+done < <(
+  labctl playground list -o json \
+    | jq -r '.[] | select(.status.stateEvents[-1].state == "RUNNING") | .id as $id | .machines[].name | [$id, .] | @tsv'
+)
+EOF
 ```
 
 ### Verify
@@ -293,18 +387,93 @@ At this stage it is worth confirming that workers in different playgrounds can r
 
 ### Cleanup
 
-Use the repo cleanup script when you want to tear down lab resources. It now removes stale, offline Tailscale devices that match current lab machine names and tag before destroying playgrounds.
+To tear down lab resources, remove matching Tailscale devices, destroy the
+playgrounds, and delete the local SSH keys:
 
 ```sh
-bash clean-up.sh
-```
+bash <<'EOF'
+set -euo pipefail
 
-Useful options:
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || { echo "Missing required command: $1" >&2; exit 1; }
+}
 
-```sh
-# Preview tailscale/playground/file cleanup actions
-bash clean-up.sh --dry-run
+require_cmd labctl
+require_cmd jq
+require_cmd curl
 
-# Destroy playgrounds and local keys, but skip tailscale API cleanup
-bash clean-up.sh --no-tailscale
+: "${TS_API_CLIENT_ID:?TS_API_CLIENT_ID must be set}"
+: "${TS_API_CLIENT_SECRET:?TS_API_CLIENT_SECRET must be set}"
+
+TS_TAGS="${TS_TAGS:-tag:kthw}"
+REPO_ROOT="$(pwd)"
+playgrounds_json="$(labctl playground list -o json)"
+
+mapfile -t PLAYGROUND_IDS < <(echo "${playgrounds_json}" | jq -r '(. // [])[]? | .id // empty')
+mapfile -t MACHINE_NAMES < <(echo "${playgrounds_json}" | jq -r '(. // [])[]? | (.machines // [])[].name // empty')
+
+oauth_resp="$(curl -sS -u "${TS_API_CLIENT_ID}:${TS_API_CLIENT_SECRET}" -d grant_type=client_credentials https://api.tailscale.com/api/v2/oauth/token)"
+access_token="$(echo "${oauth_resp}" | jq -er '.access_token')"
+
+devices_resp_file="$(mktemp)"
+curl -sS -o "${devices_resp_file}" \
+  -H "Authorization: Bearer ${access_token}" \
+  https://api.tailscale.com/api/v2/tailnet/-/devices >/dev/null
+
+declare -A target_hosts=()
+for machine_name in "${MACHINE_NAMES[@]}"; do
+  target_hosts["${machine_name}"]=1
+done
+
+declare -A required_tags=()
+IFS=',' read -r -a ts_tags_array <<<"${TS_TAGS}"
+for tag in "${ts_tags_array[@]}"; do
+  tag="$(echo "${tag}" | xargs)"
+  [ -n "${tag}" ] && required_tags["${tag}"]=1
+done
+
+while IFS=$'\t' read -r device_id device_name online tags_csv; do
+  [ -n "${device_id}" ] || continue
+  short_name="${device_name%%.*}"
+
+  match_host=false
+  if [ -n "${target_hosts[${short_name}]:-}" ]; then
+    match_host=true
+  else
+    for host in "${!target_hosts[@]}"; do
+      if [[ "${short_name}" == "${host}"-* ]]; then
+        match_host=true
+        break
+      fi
+    done
+  fi
+  [ "${match_host}" = true ] || continue
+
+  tag_match=false
+  IFS=',' read -r -a device_tags <<<"${tags_csv}"
+  for device_tag in "${device_tags[@]}"; do
+    device_tag="$(echo "${device_tag}" | xargs)"
+    if [ -n "${device_tag}" ] && [ -n "${required_tags[${device_tag}]:-}" ]; then
+      tag_match=true
+      break
+    fi
+  done
+  [ "${tag_match}" = true ] || continue
+
+  curl -sS -X DELETE \
+    -H "Authorization: Bearer ${access_token}" \
+    "https://api.tailscale.com/api/v2/device/${device_id}" >/dev/null
+done < <(jq -r '(.devices // [])[] | [(.id // ""), (.name // .hostname // ""), ((.online // false)|tostring), ((.tags // [])|join(","))] | @tsv' "${devices_resp_file}")
+
+rm -f "${devices_resp_file}"
+
+declare -A seen_playgrounds=()
+for playground_id in "${PLAYGROUND_IDS[@]}"; do
+  [ -n "${seen_playgrounds[${playground_id}]:-}" ] && continue
+  seen_playgrounds["${playground_id}"]=1
+  labctl playground destroy "${playground_id}"
+done
+
+rm -f "${REPO_ROOT}"/kubernetes.ed25519*
+EOF
 ```
