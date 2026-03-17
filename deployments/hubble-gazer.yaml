@@ -162,26 +162,6 @@ spec:
       app: hubble-gazer
 ---
 apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: hubble-gazer
-  namespace: kube-system
-  labels:
-    app: hubble-gazer
-spec:
-  ingressClassName: cilium
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: hubble-gazer
-            port:
-              number: 3000
----
-apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: hubble-gazer

@@ -8,12 +8,12 @@ kubectl -n kube-system rollout status deployment/hubble-relay --timeout=180s
 
 echo "[hubble-gazer] deploying hubble-gazer ${HUBBLE_GAZER_VERSION}"
 kubectl apply -f ~/deployments/hubble-gazer.yaml
+kubectl -n kube-system delete ingress hubble-gazer --ignore-not-found
 
 echo "[hubble-gazer] waiting for rollout"
 kubectl -n kube-system rollout status deployment/hubble-gazer --timeout=180s
 
 kubectl -n kube-system get pods -l app=hubble-gazer -o wide
 kubectl -n kube-system get svc hubble-gazer
-kubectl -n kube-system get ingress hubble-gazer
 
 echo "[hubble-gazer] deployment complete"

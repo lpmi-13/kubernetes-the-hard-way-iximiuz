@@ -129,10 +129,6 @@ helm template cilium cilium/cilium \
   --set hubble.relay.extraEnv[0].name=GOPS_CONFIG_DIR \
   --set hubble.relay.extraEnv[0].value=/tmp \
   --set hubble.ui.enabled=true \
-  --set ingressController.enabled=true \
-  --set ingressController.loadbalancerMode=shared \
-  --set ingressController.hostNetwork.enabled=true \
-  --set ingressController.hostNetwork.sharedListenerPort=8080 \
   --set 'hubble.metrics.enabled={dns,drop,tcp,flow,httpV2:exemplars=true;labelsContext=source_namespace\,destination_namespace\,source_pod\,destination_pod}' \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
@@ -159,10 +155,6 @@ This uses `helm template` to render Cilium manifests with these key settings, th
 | `hubble.enabled` | `true` | Enable Hubble flow observability |
 | `hubble.relay.enabled` | `true` | Deploy Hubble Relay for centralized flow access |
 | `hubble.ui.enabled` | `true` | Deploy Hubble UI |
-| `ingressController.enabled` | `true` | Enable the Cilium ingress controller |
-| `ingressController.loadbalancerMode` | `shared` | Use one shared ingress datapath instead of per-Ingress load balancers |
-| `ingressController.hostNetwork.enabled` | `true` | Listen directly on worker host networking |
-| `ingressController.hostNetwork.sharedListenerPort` | `8080` | Shared worker listener port used later by step 14 |
 | `operator.replicas` | `1` | Single Cilium operator replica |
 | `ipam.mode` | `kubernetes` | Use Kubernetes-native IPAM |
 | `ipam.operator.clusterPoolIPv4PodCIDRList` | `10.200.0.0/16` | Pod CIDR range |
@@ -177,12 +169,6 @@ cilium status
 ```
 
 All 9 Cilium agents should be reporting as healthy, and Hubble Relay should be connected.
-
-Verify that the `cilium` `IngressClass` exists:
-
-```bash
-kubectl get ingressclass
-```
 
 Test cross-worker pod connectivity:
 

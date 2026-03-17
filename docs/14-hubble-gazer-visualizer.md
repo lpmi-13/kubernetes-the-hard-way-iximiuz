@@ -5,8 +5,7 @@ In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/h
 This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay-grpc.kube-system.svc.cluster.local:4245`.
 The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.6.1`.
 Because this self-hosted Cilium cluster exposes the Kubernetes API through the special `default/kubernetes` service, the manifest also installs a scoped `CiliumNetworkPolicy` that allows egress to the `kube-apiserver` entity so the pod metadata informer can resolve `pod.spec.nodeName` for `Pods by Node`.
-Step 11 now enables the Cilium ingress controller in shared host-network mode on worker nodes, listening on port `8080`.
-The Hubble Gazer manifest uses two replicas behind a `ClusterIP` Service plus a `Cilium`-managed `Ingress`, and readiness now waits for Hubble Relay connectivity, Kubernetes pod metadata sync, and a short warm-up period before the ingress starts routing traffic to a replica.
+The Hubble Gazer manifest uses two replicas behind a `ClusterIP` Service, and step 14 exposes that Service through a jumpbox `kubectl port-forward` on port `3000`.
 Step 13 also installs a scoped `CiliumNetworkPolicy` for the Bookinfo request path so the `Application (L7)` tab can show HTTP traffic instead of only L4 flows.
 
 Step 13 now keeps the demo namespace intentionally compact, with a 9-pod static baseline and an 18-pod ceiling during worker scale-out, so the graph is easier to read.
@@ -37,35 +36,44 @@ labctl cp -r ./deployments "${JUMPBOX_PLAYGROUND_ID}":~/deployments
 ```sh
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system rollout status deployment/hubble-relay --timeout=180s"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl apply -f ~/deployments/hubble-gazer.yaml"
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system delete ingress hubble-gazer --ignore-not-found"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system rollout status deployment/hubble-gazer --timeout=180s"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system get pods -l app=hubble-gazer -o wide"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system get svc hubble-gazer"
-labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system get ingress hubble-gazer"
 ```
 
-## 4) Identify a ready worker ingress listener (local machine)
+## 4) Start jumpbox port-forward to the Hubble Gazer Service
 
 ```sh
-HUBBLE_INGRESS_MACHINE="$(
-  labctl ssh "${JUMPBOX_PLAYGROUND_ID}" \
-    "kubectl get nodes --no-headers | awk '\$1 ~ /^worker-/ && \$2 ~ /^Ready/ {print \$1; exit}'"
-)"
-HUBBLE_INGRESS_MACHINE="$(printf '%s' "${HUBBLE_INGRESS_MACHINE}" | tr -d '\r')"
-echo "${HUBBLE_INGRESS_MACHINE}"
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" '
+set -euo pipefail
+pid_file=/tmp/hubble-gazer-portforward.pid
+log_file=/tmp/hubble-gazer-portforward.log
 
-HUBBLE_INGRESS_PLAYGROUND_ID="$(
-  labctl playground list -o json \
-    | jq -r --arg machine "${HUBBLE_INGRESS_MACHINE}" '.[] | select(any(.machines[]; .name == $machine)) | .id' \
-    | head -n 1
-)"
-echo "${HUBBLE_INGRESS_PLAYGROUND_ID}"
+if [ -f "${pid_file}" ] && kill -0 "$(cat "${pid_file}")" 2>/dev/null; then
+  kill "$(cat "${pid_file}")" 2>/dev/null || true
+  sleep 1
+fi
+
+rm -f "${pid_file}" "${log_file}"
+nohup kubectl -n kube-system port-forward --address 0.0.0.0 svc/hubble-gazer 3000:3000 >"${log_file}" 2>&1 < /dev/null &
+echo $! > "${pid_file}"
+sleep 1
+tail -n 5 "${log_file}" || true
+'
 ```
 
-## 5) Start local labctl port-forward to the worker ingress listener
+If your browser runs on another VM that can reach the jumpbox directly, open:
+
+```txt
+http://<jumpbox-host-or-ip>:3000
+```
+
+## 5) Start local labctl port-forward to the jumpbox listener
 
 ```sh
-LOCAL_PID_FILE="${TMPDIR:-/tmp}/kthw-hubble-gazer-${HUBBLE_INGRESS_PLAYGROUND_ID}-labctl-portforward-8888.pid"
-LOCAL_LOG_FILE="${TMPDIR:-/tmp}/kthw-hubble-gazer-${HUBBLE_INGRESS_PLAYGROUND_ID}-labctl-portforward-8888.log"
+LOCAL_PID_FILE="${TMPDIR:-/tmp}/kthw-hubble-gazer-${JUMPBOX_PLAYGROUND_ID}-labctl-portforward-8888.pid"
+LOCAL_LOG_FILE="${TMPDIR:-/tmp}/kthw-hubble-gazer-${JUMPBOX_PLAYGROUND_ID}-labctl-portforward-8888.log"
 
 for stale_pid_file in "${TMPDIR:-/tmp}"/kthw-hubble-gazer-*-labctl-portforward-8888.pid; do
   [ -e "${stale_pid_file}" ] || continue
@@ -78,7 +86,7 @@ done
 if [ -f "${LOCAL_PID_FILE}" ] && kill -0 "$(cat "${LOCAL_PID_FILE}")" 2>/dev/null; then
   echo "local labctl port-forward already running (pid $(cat "${LOCAL_PID_FILE}"))"
 else
-  nohup labctl port-forward "${HUBBLE_INGRESS_PLAYGROUND_ID}" -m "${HUBBLE_INGRESS_MACHINE}" -L 8888:8080 >"${LOCAL_LOG_FILE}" 2>&1 < /dev/null &
+  nohup labctl port-forward "${JUMPBOX_PLAYGROUND_ID}" -L 8888:3000 >"${LOCAL_LOG_FILE}" 2>&1 < /dev/null &
   echo $! > "${LOCAL_PID_FILE}"
   echo "started local labctl port-forward (pid $(cat "${LOCAL_PID_FILE}"))"
 fi
@@ -134,7 +142,8 @@ kubectl -n demo get pods -l app=traffic-generator -o wide
 ## Stop background forwards later
 
 ```sh
-kill "$(cat "${TMPDIR:-/tmp}/kthw-hubble-gazer-${HUBBLE_INGRESS_PLAYGROUND_ID}-labctl-portforward-8888.pid")"
+kill "$(cat "${TMPDIR:-/tmp}/kthw-hubble-gazer-${JUMPBOX_PLAYGROUND_ID}-labctl-portforward-8888.pid")"
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kill \$(cat /tmp/hubble-gazer-portforward.pid)"
 ```
 
 Next: [Cleanup](15-cleanup.md)
