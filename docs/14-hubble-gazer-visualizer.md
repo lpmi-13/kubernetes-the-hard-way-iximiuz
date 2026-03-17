@@ -1,9 +1,9 @@
 # Optional: Hubble Gazer Visualizer
 
-In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.6.1`, a web UI that consumes Hubble Relay flow data and renders a live service traffic graph in your browser.
+In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.6.2`, a web UI that consumes Hubble Relay flow data and renders a live service traffic graph in your browser.
 
 This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay-grpc.kube-system.svc.cluster.local:4245`.
-The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.6.1`.
+The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.6.2`.
 Because this self-hosted Cilium cluster exposes the Kubernetes API through the special `default/kubernetes` service, the manifest also installs a scoped `CiliumNetworkPolicy` that allows egress to the `kube-apiserver` entity so the pod metadata informer can resolve `pod.spec.nodeName` for `Pods by Node`.
 The Hubble Gazer manifest uses two replicas behind a `ClusterIP` Service, and step 14 exposes that Service through a jumpbox `kubectl port-forward` on port `3000`.
 Step 13 also installs a scoped `CiliumNetworkPolicy` for the Bookinfo request path so the `Application (L7)` tab can show HTTP traffic instead of only L4 flows.

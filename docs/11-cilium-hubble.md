@@ -220,6 +220,6 @@ Hubble Relay aggregates flow data from all agents and exposes a single gRPC endp
 
 Hubble Relay exposes its gRPC stream on pod port `4245`. In this tutorial, the optional `hubble-gazer` add-on creates a dedicated in-cluster wrapper Service named `hubble-relay-grpc` at `hubble-relay-grpc.kube-system.svc.cluster.local:4245` so consumers can connect to Relay on its native gRPC port.
 
-The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a compatible consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. In this tutorial it is deployed as an optional add-on in step 14 using release `0.6.1`.
+The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a compatible consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. In this tutorial it is deployed as an optional add-on in step 14 using release `0.6.2`.
 
 Next: [Deploying the DNS Cluster Add-on](12-dns-addon.md)
