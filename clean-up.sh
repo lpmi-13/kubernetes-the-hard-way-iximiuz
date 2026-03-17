@@ -31,6 +31,49 @@ require_cmd() {
   fi
 }
 
+cleanup_local_labctl_port_forwards() {
+  local tmp_root="${TMPDIR:-/tmp}"
+  local matched_files=()
+  local labctl_pids=""
+  local pid=""
+
+  if command -v pgrep >/dev/null 2>&1; then
+    labctl_pids="$(pgrep -f '(^|[[:space:]])labctl port-forward([[:space:]]|$)' || true)"
+  else
+    labctl_pids="$(ps -eo pid=,args= | awk '/[l]abctl port-forward/ {print $1}' || true)"
+  fi
+  labctl_pids="$(printf '%s\n' "${labctl_pids}" | awk 'NF {print}' | sort -u || true)"
+
+  while IFS= read -r pid; do
+    [ -n "${pid}" ] || continue
+    if [ "${DRY_RUN}" = true ]; then
+      echo "dry-run: would kill local labctl port-forward pid ${pid}"
+    else
+      kill "${pid}" 2>/dev/null || true
+    fi
+  done <<< "${labctl_pids}"
+
+  while IFS= read -r path; do
+    [ -n "${path}" ] || continue
+    matched_files+=("${path}")
+  done < <(find "${tmp_root}" -maxdepth 1 -type f \
+    \( -name 'kthw-*-labctl-portforward-*.pid' -o -name 'kthw-*-labctl-portforward-*.log' \) \
+    -print 2>/dev/null)
+
+  if [ "${#matched_files[@]}" -eq 0 ]; then
+    echo "Local labctl port-forward cleanup: no kthw port-forward PID/log files found."
+    return 0
+  fi
+
+  for path in "${matched_files[@]}"; do
+    if [ "${DRY_RUN}" = true ]; then
+      echo "dry-run: would remove ${path}"
+    else
+      rm -f "${path}"
+    fi
+  done
+}
+
 while (($# > 0)); do
   case "$1" in
     --dry-run)
@@ -79,6 +122,8 @@ while IFS= read -r machine_name; do
   [ -z "$machine_name" ] && continue
   MACHINE_NAMES+=("$machine_name")
 done < <(echo "$playgrounds_json" | jq -r '(. // [])[]? | (.machines // [])[].name // empty')
+
+cleanup_local_labctl_port_forwards
 
 if [ "$SKIP_TAILSCALE" = false ]; then
   require_cmd curl

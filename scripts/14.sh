@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HUBBLE_GAZER_VERSION="0.5.0"
+HUBBLE_GAZER_VERSION="0.6.1"
 HUBBLE_LOCAL_UI_PORT=8888
 HUBBLE_JUMPBOX_FORWARD_PORT=3000
 BOOKINFO_LOCAL_UI_PORT=5000
@@ -25,13 +25,19 @@ retry_cmd() {
   done
 }
 
+run_remote_bash_script() {
+  local jumpbox_id="$1"
+  local remote_cmd="$2"
+
+  labctl ssh "${jumpbox_id}" "bash -s" <<< "${remote_cmd}"
+}
+
 stop_local_listener_on_port() {
   local local_port="$1"
-  local jumpbox_port="${2:-}"
   local listener_pids=""
 
-  if [ -n "${jumpbox_port}" ] && command -v pgrep >/dev/null 2>&1; then
-    listener_pids="$(pgrep -f "labctl port-forward .* -L ${local_port}:${jumpbox_port}" || true)"
+  if command -v pgrep >/dev/null 2>&1; then
+    listener_pids="$(pgrep -f "labctl port-forward .* -L ${local_port}:" || true)"
   fi
 
   if command -v lsof >/dev/null 2>&1; then
@@ -56,13 +62,43 @@ stop_local_listener_on_port() {
   sleep 1
 }
 
+cleanup_stale_local_port_forward_files() {
+  local name="$1"
+  local local_port="$2"
+  local keep_pid_file="${3:-}"
+  local stale_pid_file=""
+  local stale_pid=""
+
+  for stale_pid_file in "${TMPDIR:-/tmp}/kthw-${name}-"*-labctl-portforward-"${local_port}.pid"; do
+    [ -e "${stale_pid_file}" ] || continue
+    if [ -n "${keep_pid_file}" ] && [ "${stale_pid_file}" = "${keep_pid_file}" ]; then
+      continue
+    fi
+
+    stale_pid="$(cat "${stale_pid_file}" 2>/dev/null || true)"
+    if [ -n "${stale_pid}" ] && kill -0 "${stale_pid}" 2>/dev/null; then
+      continue
+    fi
+
+    rm -f "${stale_pid_file}" "${stale_pid_file%.pid}.log"
+  done
+}
+
 ensure_local_port_forward() {
-  local jumpbox_id="$1"
+  local playground_id="$1"
   local name="$2"
   local local_port="$3"
-  local jumpbox_port="$4"
-  local pid_file="${TMPDIR:-/tmp}/kthw-${name}-${jumpbox_id}-labctl-portforward-${local_port}.pid"
-  local log_file="${TMPDIR:-/tmp}/kthw-${name}-${jumpbox_id}-labctl-portforward-${local_port}.log"
+  local remote_port="$4"
+  local machine="${5:-}"
+  local pid_file="${TMPDIR:-/tmp}/kthw-${name}-${playground_id}-labctl-portforward-${local_port}.pid"
+  local log_file="${TMPDIR:-/tmp}/kthw-${name}-${playground_id}-labctl-portforward-${local_port}.log"
+  local pf_cmd=(labctl port-forward "${playground_id}" -L "${local_port}:${remote_port}")
+
+  if [ -n "${machine}" ]; then
+    pf_cmd=(labctl port-forward "${playground_id}" -m "${machine}" -L "${local_port}:${remote_port}")
+  fi
+
+  cleanup_stale_local_port_forward_files "${name}" "${local_port}" "${pid_file}"
 
   if [ -f "${pid_file}" ]; then
     local existing_pid
@@ -71,15 +107,16 @@ ensure_local_port_forward() {
       kill "${existing_pid}" 2>/dev/null || true
       sleep 1
     fi
-    rm -f "${pid_file}"
+    rm -f "${pid_file}" "${log_file}"
   fi
 
-  stop_local_listener_on_port "${local_port}" "${jumpbox_port}"
+  stop_local_listener_on_port "${local_port}" "${remote_port}"
+  cleanup_stale_local_port_forward_files "${name}" "${local_port}" "${pid_file}"
 
   if command -v setsid >/dev/null 2>&1; then
-    setsid labctl port-forward "${jumpbox_id}" -L "${local_port}:${jumpbox_port}" >"${log_file}" 2>&1 < /dev/null &
+    setsid "${pf_cmd[@]}" >"${log_file}" 2>&1 < /dev/null &
   else
-    nohup labctl port-forward "${jumpbox_id}" -L "${local_port}:${jumpbox_port}" >"${log_file}" 2>&1 < /dev/null &
+    nohup "${pf_cmd[@]}" >"${log_file}" 2>&1 < /dev/null &
   fi
   local pf_pid=$!
   echo "${pf_pid}" > "${pid_file}"
@@ -91,6 +128,51 @@ ensure_local_port_forward() {
   fi
 
   echo "${pf_pid}"
+}
+
+cleanup_jumpbox_service_port_forward() {
+  local jumpbox_id="$1"
+  local name="$2"
+  local namespace="$3"
+  local service="$4"
+  local local_port="$5"
+  local target_port="$6"
+
+  local remote_cmd
+  remote_cmd="$(cat <<EOF
+set -euo pipefail
+pid_file=/tmp/${name}-portforward.pid
+log_file=/tmp/${name}-portforward.log
+listener_pids=""
+
+if [ -f "\${pid_file}" ]; then
+  existing_pid="\$(cat "\${pid_file}" 2>/dev/null || true)"
+  if [ -n "\${existing_pid}" ] && kill -0 "\${existing_pid}" 2>/dev/null; then
+    kill "\${existing_pid}" 2>/dev/null || true
+    sleep 1
+  fi
+fi
+
+if command -v pgrep >/dev/null 2>&1; then
+  listener_pids="\$(pgrep -f "kubectl -n ${namespace} port-forward .*svc/${service} ${local_port}:${target_port}" || true)"
+fi
+if command -v lsof >/dev/null 2>&1; then
+  listener_pids="\${listener_pids}"$'\\n'"\$(lsof -tiTCP:${local_port} -sTCP:LISTEN 2>/dev/null || true)"
+fi
+if [ -z "\${listener_pids}" ] && command -v ss >/dev/null 2>&1; then
+  listener_pids="\$(ss -ltnp "( sport = :${local_port} )" 2>/dev/null | awk -F'pid=' 'NR > 1 && NF > 1 {split(\$2, a, ","); print a[1]}' | sort -u || true)"
+fi
+
+printf '%s\\n' "\${listener_pids}" | awk 'NF {print}' | sort -u | while IFS= read -r pid; do
+  [ -n "\${pid}" ] || continue
+  kill "\${pid}" 2>/dev/null || true
+done
+
+rm -f "\${pid_file}" "\${log_file}"
+EOF
+)"
+
+  retry_cmd 5 run_remote_bash_script "${jumpbox_id}" "${remote_cmd}" >/dev/null
 }
 
 ensure_jumpbox_service_port_forward() {
@@ -107,14 +189,65 @@ set -euo pipefail
 pid_file=/tmp/${name}-portforward.pid
 log_file=/tmp/${name}-portforward.log
 
+stop_jumpbox_listener_on_port() {
+  local forward_port="\$1"
+  local listener_pids=""
+
+  if command -v pgrep >/dev/null 2>&1; then
+    listener_pids="\$(pgrep -f "kubectl -n ${namespace} port-forward .*svc/${service} ${local_port}:${target_port}" || true)"
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    listener_pids="\${listener_pids}"$'\\n'"\$(lsof -tiTCP:\${forward_port} -sTCP:LISTEN 2>/dev/null || true)"
+  fi
+
+  if [ -z "\${listener_pids}" ] && command -v ss >/dev/null 2>&1; then
+    listener_pids="\$(ss -ltnp "( sport = :\${forward_port} )" 2>/dev/null | awk -F'pid=' 'NR > 1 && NF > 1 {split(\$2, a, ","); print a[1]}' | sort -u || true)"
+  fi
+
+  listener_pids="\$(printf '%s\\n' "\${listener_pids}" | awk 'NF {print}' | sort -u || true)"
+
+  if [ -z "\${listener_pids}" ]; then
+    return 0
+  fi
+
+  while IFS= read -r pid; do
+    [ -n "\${pid}" ] || continue
+    kill "\${pid}" 2>/dev/null || true
+  done <<< "\${listener_pids}"
+
+  sleep 1
+}
+
+cleanup_stale_jumpbox_port_forward_files() {
+  local stale_pid=""
+
+  if [ ! -f "\${pid_file}" ]; then
+    return 0
+  fi
+
+  stale_pid="\$(cat "\${pid_file}" 2>/dev/null || true)"
+  if [ -n "\${stale_pid}" ] && kill -0 "\${stale_pid}" 2>/dev/null; then
+    return 0
+  fi
+
+  rm -f "\${pid_file}" "\${log_file}"
+}
+
+cleanup_stale_jumpbox_port_forward_files
+
 if [ -f "\${pid_file}" ]; then
   existing_pid="\$(cat "\${pid_file}" 2>/dev/null || true)"
   if [ -n "\${existing_pid}" ] && kill -0 "\${existing_pid}" 2>/dev/null; then
     kill "\${existing_pid}" 2>/dev/null || true
     sleep 1
   fi
-  rm -f "\${pid_file}"
+  rm -f "\${pid_file}" "\${log_file}"
 fi
+
+stop_jumpbox_listener_on_port "${local_port}"
+cleanup_stale_jumpbox_port_forward_files
+rm -f "\${log_file}"
 
 nohup kubectl -n ${namespace} port-forward --address 0.0.0.0 svc/${service} ${local_port}:${target_port} >"\${log_file}" 2>&1 < /dev/null &
 new_pid=\$!
@@ -130,7 +263,7 @@ echo "\${new_pid}"
 EOF
 )"
 
-  retry_cmd 5 labctl ssh "${jumpbox_id}" "bash -lc '${remote_cmd}'" | tail -n 1
+  retry_cmd 5 run_remote_bash_script "${jumpbox_id}" "${remote_cmd}" | tail -n 1
 }
 
 wait_for_local_healthz() {
@@ -139,7 +272,7 @@ wait_for_local_healthz() {
   local attempts="${3:-40}"
 
   for _ in $(seq 1 "${attempts}"); do
-    if [ "$(curl -fsS "${url}" 2>/dev/null || true)" = "${expected_body}" ]; then
+    if [ "$(curl -fsS --connect-timeout 2 --max-time 2 "${url}" 2>/dev/null || true)" = "${expected_body}" ]; then
       return 0
     fi
     sleep 1
@@ -152,7 +285,7 @@ wait_for_local_http_ok() {
   local attempts="${2:-40}"
 
   for _ in $(seq 1 "${attempts}"); do
-    if curl -fsS -o /dev/null "${url}" 2>/dev/null; then
+    if curl -fsS --connect-timeout 2 --max-time 2 -o /dev/null "${url}" 2>/dev/null; then
       return 0
     fi
     sleep 1
@@ -192,8 +325,8 @@ HUBBLE_LOCAL_PF_PID="$(
     "${HUBBLE_JUMPBOX_FORWARD_PORT}"
 )"
 
-if ! wait_for_local_healthz "http://127.0.0.1:${HUBBLE_LOCAL_UI_PORT}/healthz" "ok"; then
-  echo "hubble-gazer did not become reachable at http://localhost:${HUBBLE_LOCAL_UI_PORT}/healthz" >&2
+if ! wait_for_local_healthz "http://127.0.0.1:${HUBBLE_LOCAL_UI_PORT}/readyz" "ok"; then
+  echo "hubble-gazer did not become reachable at http://localhost:${HUBBLE_LOCAL_UI_PORT}/readyz" >&2
   echo "local port-forward log: ${TMPDIR:-/tmp}/kthw-hubble-gazer-${JUMPBOX_PLAYGROUND_ID}-labctl-portforward-${HUBBLE_LOCAL_UI_PORT}.log" >&2
   labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "tail -n 30 /tmp/hubble-gazer-portforward.log" >&2 || true
   exit 1

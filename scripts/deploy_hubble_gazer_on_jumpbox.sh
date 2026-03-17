@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HUBBLE_GAZER_VERSION="0.5.0"
+HUBBLE_GAZER_VERSION="0.6.1"
 
 echo "[hubble-gazer] verifying Hubble Relay is ready"
 kubectl -n kube-system rollout status deployment/hubble-relay --timeout=180s
@@ -14,5 +14,6 @@ kubectl -n kube-system rollout status deployment/hubble-gazer --timeout=180s
 
 kubectl -n kube-system get pods -l app=hubble-gazer -o wide
 kubectl -n kube-system get svc hubble-gazer
+kubectl -n kube-system get ingress hubble-gazer
 
 echo "[hubble-gazer] deployment complete"

@@ -58,7 +58,13 @@ metadata:
   labels:
     app: hubble-gazer
 spec:
-  replicas: 1
+  replicas: 2
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: hubble-gazer
@@ -68,9 +74,18 @@ spec:
         app: hubble-gazer
     spec:
       serviceAccountName: hubble-gazer
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: hubble-gazer
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: hubble-gazer
-        image: ghcr.io/lpmi-13/hubble-gazer:0.5.0
+        image: ghcr.io/lpmi-13/hubble-gazer:0.6.1
         ports:
         - containerPort: 3000
         env:
@@ -78,13 +93,19 @@ spec:
           value: hubble-relay-grpc.kube-system.svc.cluster.local:4245
         - name: LISTEN_ADDR
           value: ":3000"
+        - name: READINESS_REQUIRE_HUBBLE_CONNECTED
+          value: "true"
+        - name: READINESS_REQUIRE_POD_METADATA
+          value: "true"
+        - name: READINESS_WARMUP_DURATION
+          value: "10s"
         resources:
           requests:
             cpu: 50m
-            memory: 64Mi
+            memory: 128Mi
           limits:
             cpu: 200m
-            memory: 128Mi
+            memory: 256Mi
         securityContext:
           runAsNonRoot: true
           runAsUser: 65534
@@ -96,10 +117,10 @@ spec:
             type: RuntimeDefault
         readinessProbe:
           httpGet:
-            path: /healthz
+            path: /readyz
             port: 3000
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 5
         livenessProbe:
           httpGet:
             path: /healthz
@@ -116,12 +137,49 @@ metadata:
     app: hubble-gazer
 spec:
   type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
   ports:
   - port: 3000
     targetPort: 3000
     name: http
   selector:
     app: hubble-gazer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hubble-gazer
+  namespace: kube-system
+  labels:
+    app: hubble-gazer
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hubble-gazer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hubble-gazer
+  namespace: kube-system
+  labels:
+    app: hubble-gazer
+spec:
+  ingressClassName: cilium
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hubble-gazer
+            port:
+              number: 3000
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -147,12 +205,22 @@ spec:
     ports:
     - port: 4245
       protocol: TCP
-  - ports:
-    - port: 443
-      protocol: TCP
   - to: []
     ports:
     - port: 53
       protocol: UDP
     - port: 53
       protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: hubble-gazer-kube-apiserver
+  namespace: kube-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: hubble-gazer
+  egress:
+  - toEntities:
+    - kube-apiserver

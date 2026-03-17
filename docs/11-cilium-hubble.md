@@ -45,14 +45,49 @@ By setting `--node-ip` to the Tailscale address, the Kubernetes node object adve
 CILIUM_CLI_VERSION="v0.19.2"
 HELM_VERSION="v3.17.0"
 
-if [ ! -f /usr/local/bin/cilium ]; then
-  curl -sL "https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" \
-    | tar xz -C /usr/local/bin
+has_working_binary() {
+  local binary_path="$1"
+  shift
+
+  [ -x "${binary_path}" ] && "$@" >/dev/null 2>&1
+}
+
+install_tarball_binary() {
+  local name="$1"
+  local url="$2"
+  local archive_member="$3"
+  local target_path="$4"
+  local temp_dir extract_dir tarball_path target_dir target_tmp
+
+  temp_dir="$(mktemp -d)"
+  extract_dir="${temp_dir}/extract"
+  tarball_path="${temp_dir}/${name}.tar.gz"
+  target_dir="$(dirname "${target_path}")"
+  target_tmp="${target_dir}/.${name}.tmp.$$"
+  mkdir -p "${extract_dir}"
+
+  curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 120 -o "${tarball_path}" "${url}"
+  tar xzf "${tarball_path}" -C "${extract_dir}" "${archive_member}"
+  install -m 0755 "${extract_dir}/${archive_member}" "${target_tmp}"
+  mv -f "${target_tmp}" "${target_path}"
+
+  rm -rf "${temp_dir}"
+}
+
+if ! has_working_binary /usr/local/bin/cilium /usr/local/bin/cilium version --client; then
+  install_tarball_binary \
+    cilium \
+    "https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" \
+    cilium \
+    /usr/local/bin/cilium
 fi
 
-if [ ! -f /usr/local/bin/helm ]; then
-  curl -sL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
-    | tar xz --strip-components=1 -C /usr/local/bin linux-amd64/helm
+if ! has_working_binary /usr/local/bin/helm /usr/local/bin/helm version --short; then
+  install_tarball_binary \
+    helm \
+    "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+    linux-amd64/helm \
+    /usr/local/bin/helm
 fi
 
 cilium version --client
@@ -62,6 +97,8 @@ helm version --short
 This installs:
 - **Cilium CLI** (v0.19.2) — for checking Cilium status and connectivity
 - **Helm** (v3.17.0) — for rendering Cilium's Kubernetes manifests
+
+The install uses a temporary file plus `mv` to avoid leaving behind a partially written binary if the download is interrupted.
 
 ## Deploy Cilium
 
@@ -92,6 +129,10 @@ helm template cilium cilium/cilium \
   --set hubble.relay.extraEnv[0].name=GOPS_CONFIG_DIR \
   --set hubble.relay.extraEnv[0].value=/tmp \
   --set hubble.ui.enabled=true \
+  --set ingressController.enabled=true \
+  --set ingressController.loadbalancerMode=shared \
+  --set ingressController.hostNetwork.enabled=true \
+  --set ingressController.hostNetwork.sharedListenerPort=8080 \
   --set 'hubble.metrics.enabled={dns,drop,tcp,flow,httpV2:exemplars=true;labelsContext=source_namespace\,destination_namespace\,source_pod\,destination_pod}' \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
@@ -118,6 +159,10 @@ This uses `helm template` to render Cilium manifests with these key settings, th
 | `hubble.enabled` | `true` | Enable Hubble flow observability |
 | `hubble.relay.enabled` | `true` | Deploy Hubble Relay for centralized flow access |
 | `hubble.ui.enabled` | `true` | Deploy Hubble UI |
+| `ingressController.enabled` | `true` | Enable the Cilium ingress controller |
+| `ingressController.loadbalancerMode` | `shared` | Use one shared ingress datapath instead of per-Ingress load balancers |
+| `ingressController.hostNetwork.enabled` | `true` | Listen directly on worker host networking |
+| `ingressController.hostNetwork.sharedListenerPort` | `8080` | Shared worker listener port used later by step 14 |
 | `operator.replicas` | `1` | Single Cilium operator replica |
 | `ipam.mode` | `kubernetes` | Use Kubernetes-native IPAM |
 | `ipam.operator.clusterPoolIPv4PodCIDRList` | `10.200.0.0/16` | Pod CIDR range |
@@ -132,6 +177,12 @@ cilium status
 ```
 
 All 9 Cilium agents should be reporting as healthy, and Hubble Relay should be connected.
+
+Verify that the `cilium` `IngressClass` exists:
+
+```bash
+kubectl get ingressclass
+```
 
 Test cross-worker pod connectivity:
 
@@ -183,6 +234,6 @@ Hubble Relay aggregates flow data from all agents and exposes a single gRPC endp
 
 Hubble Relay exposes its gRPC stream on pod port `4245`. In this tutorial, the optional `hubble-gazer` add-on creates a dedicated in-cluster wrapper Service named `hubble-relay-grpc` at `hubble-relay-grpc.kube-system.svc.cluster.local:4245` so consumers can connect to Relay on its native gRPC port.
 
-The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a compatible consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. In this tutorial it is deployed as an optional add-on in step 14 using release `0.5.0`.
+The [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) project is a compatible consumer: a single-container Go + React application that connects to Hubble Relay's gRPC API and renders a live network flow visualization in the browser. In this tutorial it is deployed as an optional add-on in step 14 using release `0.6.1`.
 
 Next: [Deploying the DNS Cluster Add-on](12-dns-addon.md)

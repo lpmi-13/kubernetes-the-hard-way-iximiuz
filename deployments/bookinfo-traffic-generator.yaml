@@ -209,3 +209,63 @@ spec:
         configMap:
           name: traffic-generator-scripts
           defaultMode: 0755
+---
+# Enable HTTP L7 visibility for the Bookinfo request path without changing
+# the Redis queue traffic used by the autoscaling demo.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: bookinfo-l7-visibility
+  namespace: demo
+spec:
+  endpointSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - traffic-generator
+      - productpage
+      - reviews
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": demo
+        app: productpage
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": demo
+        app: details
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": demo
+        app: reviews
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": demo
+        app: ratings
+    toPorts:
+    - ports:
+      - port: "9080"
+        protocol: TCP
+      rules:
+        http:
+        - method: ".*"
+          path: "/.*"
+  - toEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": demo
+        app: redis
+    toPorts:
+    - ports:
+      - port: "6379"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": kube-system
+        "k8s:k8s-app": kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      - port: "53"
+        protocol: TCP
+      rules:
+        dns:
+        - matchPattern: "*"

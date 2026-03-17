@@ -4,6 +4,18 @@ In this lab you will delete the compute resources created during the tutorial.
 
 ## Destroy Playgrounds
 
+Stop any local `labctl port-forward` processes and remove their stale PID/log files first:
+
+```sh
+for pid in $(pgrep -f '(^|[[:space:]])labctl port-forward([[:space:]]|$)' || true); do
+  kill "${pid}" 2>/dev/null || true
+done
+
+find "${TMPDIR:-/tmp}" -maxdepth 1 -type f \
+  \( -name 'kthw-*-labctl-portforward-*.pid' -o -name 'kthw-*-labctl-portforward-*.log' \) \
+  -delete
+```
+
 List playgrounds and destroy each one:
 
 ```sh

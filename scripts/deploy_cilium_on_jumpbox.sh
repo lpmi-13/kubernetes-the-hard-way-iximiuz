@@ -37,6 +37,10 @@ helm template cilium cilium/cilium \
   --set hubble.relay.extraEnv[0].name=GOPS_CONFIG_DIR \
   --set hubble.relay.extraEnv[0].value=/tmp \
   --set hubble.ui.enabled=true \
+  --set ingressController.enabled=true \
+  --set ingressController.loadbalancerMode=shared \
+  --set ingressController.hostNetwork.enabled=true \
+  --set ingressController.hostNetwork.sharedListenerPort=8080 \
   --set 'hubble.metrics.enabled={dns,drop,tcp,flow,httpV2:exemplars=true;labelsContext=source_namespace\,destination_namespace\,source_pod\,destination_pod}' \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
