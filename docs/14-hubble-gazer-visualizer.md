@@ -4,6 +4,7 @@ In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/h
 
 This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay-grpc.kube-system.svc.cluster.local:4245`.
 The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.5.0`.
+Its `NetworkPolicy` also allows egress to the Kubernetes API server on `443` so the pod metadata informer can resolve `pod.spec.nodeName` for `Pods by Node`.
 
 Step 13 now keeps the demo namespace intentionally compact, with a 9-pod static baseline and an 18-pod ceiling during worker scale-out, so the graph is easier to read.
 

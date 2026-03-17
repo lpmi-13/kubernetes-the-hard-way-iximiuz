@@ -147,6 +147,9 @@ spec:
     ports:
     - port: 4245
       protocol: TCP
+  - ports:
+    - port: 443
+      protocol: TCP
   - to: []
     ports:
     - port: 53
