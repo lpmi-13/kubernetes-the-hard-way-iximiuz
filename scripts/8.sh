@@ -7,34 +7,39 @@ CONTROL_PLANE_PLAYGROUND_ID=$(labctl playground list -o json | jq -r '.[] | sele
 ARTIFACT_DIR="$(mktemp -d)"
 trap 'rm -rf "${ARTIFACT_DIR}"' EXIT
 CONTROLLER_BUNDLE_DIR="${ARTIFACT_DIR}/control-plane"
+JUMPBOX_CONTROLLER_EXPORT_DIR="~/control-plane-export"
 
-mkdir -p "${CONTROLLER_BUNDLE_DIR}"
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "
+  rm -rf ${JUMPBOX_CONTROLLER_EXPORT_DIR}
+  mkdir -p ${JUMPBOX_CONTROLLER_EXPORT_DIR}
+  cp \
+    ~/downloads/controller/kube-apiserver \
+    ~/downloads/controller/kube-controller-manager \
+    ~/downloads/controller/kube-scheduler \
+    ~/downloads/client/kubectl \
+    ~/ca.crt \
+    ~/ca.key \
+    ~/front-proxy-ca.crt \
+    ~/front-proxy-client.crt \
+    ~/front-proxy-client.key \
+    ~/kube-api-server.crt \
+    ~/kube-api-server.key \
+    ~/service-accounts.crt \
+    ~/service-accounts.key \
+    ~/encryption-config.yaml \
+    ~/kube-controller-manager.kubeconfig \
+    ~/kube-scheduler.kubeconfig \
+    ${JUMPBOX_CONTROLLER_EXPORT_DIR}/
+"
 
-for binary in kube-apiserver kube-controller-manager kube-scheduler; do
-  labctl cp "${JUMPBOX_PLAYGROUND_ID}:~/downloads/controller/${binary}" "${CONTROLLER_BUNDLE_DIR}/${binary}"
-done
-labctl cp "${JUMPBOX_PLAYGROUND_ID}:~/downloads/client/kubectl" "${CONTROLLER_BUNDLE_DIR}/kubectl"
+labctl cp -r "${JUMPBOX_PLAYGROUND_ID}:${JUMPBOX_CONTROLLER_EXPORT_DIR}" "${ARTIFACT_DIR}"
+mv "${ARTIFACT_DIR}/control-plane-export" "${CONTROLLER_BUNDLE_DIR}"
+
 cp "${REPO_ROOT}/units/kube-apiserver.service" "${CONTROLLER_BUNDLE_DIR}/kube-apiserver.service"
 cp "${REPO_ROOT}/units/kube-controller-manager.service" "${CONTROLLER_BUNDLE_DIR}/kube-controller-manager.service"
 cp "${REPO_ROOT}/units/kube-scheduler.service" "${CONTROLLER_BUNDLE_DIR}/kube-scheduler.service"
 cp "${REPO_ROOT}/configs/kube-scheduler.yaml" "${CONTROLLER_BUNDLE_DIR}/kube-scheduler.yaml"
 cp "${REPO_ROOT}/scripts/install_control_plane_on_controller.sh" "${CONTROLLER_BUNDLE_DIR}/install_control_plane_on_controller.sh"
-for file in \
-  ca.crt \
-  ca.key \
-  front-proxy-ca.crt \
-  front-proxy-client.crt \
-  front-proxy-client.key \
-  kube-api-server.crt \
-  kube-api-server.key \
-  service-accounts.crt \
-  service-accounts.key \
-  encryption-config.yaml \
-  kube-controller-manager.kubeconfig \
-  kube-scheduler.kubeconfig
-do
-  labctl cp "${JUMPBOX_PLAYGROUND_ID}:~/${file}" "${CONTROLLER_BUNDLE_DIR}/${file}"
-done
 
 labctl cp ./scripts/install_haproxy.sh $CONTROL_PLANE_PLAYGROUND_ID:~/install_haproxy.sh --machine load-balancer
 labctl cp ./scripts/update_hosts_for_api.sh $JUMPBOX_PLAYGROUND_ID:~/update_hosts_for_api.sh

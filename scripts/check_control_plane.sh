@@ -9,7 +9,7 @@ run_remote() {
   local playground_id="$1"
   shift
 
-  timeout 20 labctl ssh "${playground_id}" "$@"
+  timeout 20 labctl ssh "${playground_id}" "$@" < /dev/null
 }
 
 if [ -z "${CONTROL_PLANE_PLAYGROUND_ID}" ] || [ "${CONTROL_PLANE_PLAYGROUND_ID}" = "null" ]; then
