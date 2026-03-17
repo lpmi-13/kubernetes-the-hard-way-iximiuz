@@ -85,7 +85,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
       - name: hubble-gazer
-        image: ghcr.io/lpmi-13/hubble-gazer:0.6.1
+        image: ghcr.io/lpmi-13/hubble-gazer:0.6.2
         ports:
         - containerPort: 3000
         env:
