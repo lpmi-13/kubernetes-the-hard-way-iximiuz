@@ -128,7 +128,6 @@ helm template cilium cilium/cilium \
   --set hubble.relay.enabled=true \
   --set hubble.relay.extraEnv[0].name=GOPS_CONFIG_DIR \
   --set hubble.relay.extraEnv[0].value=/tmp \
-  --set hubble.ui.enabled=true \
   --set 'hubble.metrics.enabled={dns,drop,tcp,flow,httpV2:exemplars=true;labelsContext=source_namespace\,destination_namespace\,source_pod\,destination_pod}' \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \
@@ -154,7 +153,6 @@ This uses `helm template` to render Cilium manifests with these key settings, th
 | `k8sServicePort` | `6443` | API server port |
 | `hubble.enabled` | `true` | Enable Hubble flow observability |
 | `hubble.relay.enabled` | `true` | Deploy Hubble Relay for centralized flow access |
-| `hubble.ui.enabled` | `true` | Deploy Hubble UI |
 | `operator.replicas` | `1` | Single Cilium operator replica |
 | `ipam.mode` | `kubernetes` | Use Kubernetes-native IPAM |
 | `ipam.operator.clusterPoolIPv4PodCIDRList` | `10.200.0.0/16` | Pod CIDR range |
@@ -185,11 +183,6 @@ kubectl -n kube-system exec -i ds/cilium -- hubble observe --last 10
 ## Architecture
 
 ```
-                    ┌─────────────────┐
-                    │   Hubble UI     │
-                    │  (kube-system)  │
-                    └────────┬────────┘
-                             │
                     ┌────────▼────────┐
                     │  Hubble Relay   │ ◄── gRPC :4245
                     │  (kube-system)  │
@@ -214,7 +207,7 @@ Each Cilium agent runs as a DaemonSet pod on every worker. It:
 3. Implements kube-proxy functionality (service ClusterIP/NodePort) in eBPF
 4. Reports flow data to Hubble Relay via gRPC
 
-Hubble Relay aggregates flow data from all agents and exposes a single gRPC endpoint that clients (Hubble UI, CLI, or custom tools) can connect to.
+Hubble Relay aggregates flow data from all agents and exposes a single gRPC endpoint that clients (CLI or custom tools such as `hubble-gazer`) can connect to.
 
 ## Consuming Hubble data
 

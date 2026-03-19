@@ -267,6 +267,6 @@ Run `cilium status` to confirm the full stack is green:
 cilium status
 ```
 
-You should see all components reporting **OK**: Cilium (9/9 agents), Operator, Envoy DaemonSet, Hubble Relay, and Hubble UI.
+You should see all components reporting **OK**: Cilium (9/9 agents), Operator, Envoy DaemonSet, and Hubble Relay.
 
 Next: [Smoke Test](13-smoke-test.md)

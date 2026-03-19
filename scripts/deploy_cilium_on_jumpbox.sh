@@ -36,7 +36,6 @@ helm template cilium cilium/cilium \
   --set hubble.relay.enabled=true \
   --set hubble.relay.extraEnv[0].name=GOPS_CONFIG_DIR \
   --set hubble.relay.extraEnv[0].value=/tmp \
-  --set hubble.ui.enabled=true \
   --set 'hubble.metrics.enabled={dns,drop,tcp,flow,httpV2:exemplars=true;labelsContext=source_namespace\,destination_namespace\,source_pod\,destination_pod}' \
   --set operator.replicas=1 \
   --set ipam.mode=cluster-pool \

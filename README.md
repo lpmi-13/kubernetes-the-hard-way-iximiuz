@@ -63,6 +63,6 @@ We also set the hostnames as above, so we can install/start tailscale on each no
 
 13) We install KEDA, deploy the Bookinfo sample application with wave-based traffic generation plus a Redis-backed worker queue, and run the full smoke test suite: data encryption at rest, deployments, port-forwarding, logs, exec, NodePort, DNS resolution, Cilium/Hubble health, Bookinfo connectivity, and visible KEDA-driven worker scale-out and scale-in.
 
-14) Optional add-on: deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.3.0` to consume Hubble Relay flow data and visualize live traffic in a browser tab via exposed ports.
+14) Optional add-on: deploy [hubble-gazer](https://github.com/lpmi-13/hubble-gazer) `0.6.2` to consume Hubble Relay flow data and visualize live traffic in a browser tab via exposed ports.
 
-15) We cleanup with `bash clean-up.sh`, which removes stale Tailscale devices and then terminates all playgrounds.
+15) We remove stale Tailscale devices and terminate the playgrounds using the commands in [docs/15-cleanup.md](docs/15-cleanup.md).

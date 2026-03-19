@@ -5,7 +5,7 @@ In this optional lab you will deploy [hubble-gazer](https://github.com/lpmi-13/h
 This guide assumes `HUBBLE_RELAY_ADDR=hubble-relay-grpc.kube-system.svc.cluster.local:4245`.
 The provided manifest deploys `ghcr.io/lpmi-13/hubble-gazer:0.6.2`.
 Because this self-hosted Cilium cluster exposes the Kubernetes API through the special `default/kubernetes` service, the manifest also installs a scoped `CiliumNetworkPolicy` that allows egress to the `kube-apiserver` entity so the pod metadata informer can resolve `pod.spec.nodeName` for `Pods by Node`.
-The Hubble Gazer manifest uses two replicas behind a `ClusterIP` Service, and step 14 exposes that Service through a jumpbox `kubectl port-forward` on port `3000`.
+The Hubble Gazer manifest uses two replicas behind a `ClusterIP` Service for the existing jumpbox `kubectl port-forward` workflow, and also creates a dedicated `NodePort` Service on port `30080` for direct worker-node access.
 Step 13 also installs a scoped `CiliumNetworkPolicy` for the Bookinfo request path so the `Application (L7)` tab can show HTTP traffic instead of only L4 flows.
 
 Step 13 now keeps the demo namespace intentionally compact, with a 9-pod static baseline and an 18-pod ceiling during worker scale-out, so the graph is easier to read.
@@ -36,10 +36,34 @@ labctl cp -r ./deployments "${JUMPBOX_PLAYGROUND_ID}":~/deployments
 ```sh
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system rollout status deployment/hubble-relay --timeout=180s"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl apply -f ~/deployments/hubble-gazer.yaml"
-labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system delete ingress hubble-gazer --ignore-not-found"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system rollout status deployment/hubble-gazer --timeout=180s"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system get pods -l app=hubble-gazer -o wide"
 labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system get svc hubble-gazer"
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" "kubectl -n kube-system get svc hubble-gazer-nodeport"
+```
+
+The direct worker-node entrypoint is:
+
+```txt
+http://<worker-node-host-or-ip>:30080
+```
+
+Important: `3000` is the container and Service port, not a port bound on the worker itself.
+If you want to expose a worker VM directly, expose `30080`, not `3000`.
+Because this is a `NodePort`, any worker node can serve it, even if the selected Hubble Gazer pod is running on a different worker.
+
+You can verify the direct path from the jumpbox with:
+
+```sh
+labctl ssh "${JUMPBOX_PLAYGROUND_ID}" '
+set -euo pipefail
+NODE_PORT=$(kubectl -n kube-system get svc hubble-gazer-nodeport -o jsonpath="{.spec.ports[0].nodePort}")
+for node in $(kubectl get nodes -o jsonpath="{range .items[*]}{.metadata.name}{\"\n\"}{end}"); do
+  echo "checking http://${node}:${NODE_PORT}/readyz"
+  curl -fsS "http://${node}:${NODE_PORT}/readyz"
+  echo
+done
+'
 ```
 
 ## 4) Start jumpbox port-forward to the Hubble Gazer Service

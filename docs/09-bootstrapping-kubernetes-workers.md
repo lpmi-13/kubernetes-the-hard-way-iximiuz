@@ -218,6 +218,6 @@ ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 \
 
 Nodes will show `NotReady` — this is expected. They will become `Ready` after Cilium is deployed.
 
-Before moving on, it is useful to confirm that workers can reach each other’s kubelet endpoints over their Tailscale addresses. Failures here usually indicate a deeper worker-to-worker connectivity problem and tend to surface later as Cilium, metrics-server, or HPA issues.
+Before moving on, it is useful to confirm that workers can reach each other’s kubelet endpoints over their Tailscale addresses. Failures here usually indicate a deeper worker-to-worker connectivity problem and tend to surface later as Cilium or autoscaling issues.
 
 Next: [Configuring kubectl for Remote Access](10-configuring-kubectl.md)

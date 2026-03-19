@@ -353,7 +353,12 @@ else
 fi
 
 if ! command -v tailscale >/dev/null 2>&1; then
-  curl -fsSL https://tailscale.com/install.sh | sh
+  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg \
+    | $SUDO tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+  curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list \
+    | $SUDO tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+  $SUDO apt-get update
+  $SUDO apt-get install -y tailscale
 fi
 
 $SUDO systemctl enable --now tailscaled

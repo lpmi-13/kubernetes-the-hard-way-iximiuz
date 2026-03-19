@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOTENV_FILE="${DOTENV_FILE:-${REPO_ROOT}/.env}"
 
-# Tailscale cleanup: remove devices that match current lab machine names and tag.
+# Tailscale cleanup: remove tagged lab devices by stable name prefix before rebuild.
 if [ -f "$DOTENV_FILE" ]; then
   set -a
   # shellcheck disable=SC1090
@@ -13,17 +13,6 @@ if [ -f "$DOTENV_FILE" ]; then
 fi
 
 TS_TAGS="${TS_TAGS:-tag:kthw}"
-
-worker_names_for_cluster() {
-  local cluster_index="$1"
-
-  if [ "${cluster_index}" -ne 1 ]; then
-    echo "unsupported worker cluster index: ${cluster_index}" >&2
-    return 1
-  fi
-
-  printf 'worker-%d\n' 1 2 3 4 5
-}
 
 wait_for_running_machines() {
   local max_attempts="$1"
@@ -52,22 +41,21 @@ wait_for_running_machines() {
   return 1
 }
 
-delete_tailscale_devices_matching_hosts() {
+delete_tailscale_devices_matching_prefixes() {
   local context_label="$1"
   shift
-  local -a machine_names=("$@")
+  local -a name_prefixes=("$@")
   local oauth_resp_file oauth_http_code access_token
   local devices_resp_file devices_http_code api_message
   local cleanup_candidates cleanup_deleted cleanup_failed
   local device_id device_name online tags_csv short_name match_host tag_match
   local delete_resp_file delete_http_code
-  local -A target_hosts=()
   local -A required_tags=()
   local -a ts_tags_array=()
   local -a device_tags=()
-  local tag device_tag
+  local tag device_tag prefix
 
-  if [ "${#machine_names[@]}" -eq 0 ]; then
+  if [ "${#name_prefixes[@]}" -eq 0 ]; then
     return 0
   fi
 
@@ -102,11 +90,6 @@ delete_tailscale_devices_matching_hosts() {
     return 1
   fi
 
-  for name in "${machine_names[@]}"; do
-    [ -n "${name}" ] || continue
-    target_hosts["${name}"]=1
-  done
-
   IFS=',' read -r -a ts_tags_array <<<"${TS_TAGS}"
   for tag in "${ts_tags_array[@]}"; do
     tag="$(echo "${tag}" | xargs)"
@@ -123,16 +106,13 @@ delete_tailscale_devices_matching_hosts() {
 
     short_name="${device_name%%.*}"
     match_host=false
-    if [ -n "${target_hosts[$short_name]:-}" ]; then
-      match_host=true
-    else
-      for name in "${!target_hosts[@]}"; do
-        if [[ "${short_name}" == "${name}"-* ]]; then
-          match_host=true
-          break
-        fi
-      done
-    fi
+    for prefix in "${name_prefixes[@]}"; do
+      [ -n "${prefix}" ] || continue
+      if [[ "${short_name}" == "${prefix}"* ]]; then
+        match_host=true
+        break
+      fi
+    done
     if [ "${match_host}" = false ]; then
       continue
     fi
@@ -311,8 +291,12 @@ if [ -n "${TS_API_CLIENT_ID:-}" ] && [ -n "${TS_API_CLIENT_SECRET:-}" ]; then
     echo "curl not found; skipping tailscale cleanup" >&2
   else
     echo "cleaning up tailscale devices..."
-    mapfile -t existing_machine_names < <(labctl playground list -o json | jq -r '(. // [])[]? | (.machines // [])[].name // empty')
-    if ! delete_tailscale_devices_matching_hosts "initial cleanup" "${existing_machine_names[@]}"; then
+    if ! delete_tailscale_devices_matching_prefixes \
+      "initial cleanup" \
+      controller- \
+      worker- \
+      load-balancer \
+      jumpbox; then
       echo "tailscale cleanup failed; aborting before playground rebuild." >&2
       exit 1
     fi
