@@ -6,6 +6,8 @@ This is the working title of creating a mega-cluster on Iximiuz Labs via tailsca
 
 The idea is that in the original k8s-the-hard-way, we had 3 control plan nodes and 3 worker nodes, but now we're going to have one cluster of control plane nodes (3) and three clusters of worker nodes (3 x 3)...all networked via tailscale.
 
+> this got downscoped from 3 clusters of 3 worker nodes to just 1 cluster of 5 worker nodes. you can read about that journey [here](https://dev.to/lpmi13/an-iximiuz-cluster-of-clusters-with-tailscale-and-cilium-43d4)
+
 We'll also have one admin node in a standalone ubuntu playground to act as the jumpbox (a concept that Kelsey Hightower introduced in the later K8s the hard way walkthroughs to simplify the setup a bit, so I copied it here as well). This is the machine that we'll use to actually provision the k8s megacluster, and since it's also an ephemeral VM, there's no clean up to be done, just shut it down!
 
 
