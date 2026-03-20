@@ -57,7 +57,7 @@ for controller in controller-{1..3}; do
 done
 
 for i in {1..60}; do
-  if labctl ssh $JUMPBOX_PLAYGROUND_ID "ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 'kubectl get componentstatuses --kubeconfig /root/admin.kubeconfig'" >/dev/null 2>&1; then
+  if labctl ssh $JUMPBOX_PLAYGROUND_ID "ssh -i ~/.ssh/kubernetes.ed25519 root@controller-1 \"kubectl get --raw='/readyz' --kubeconfig /root/admin.kubeconfig\"" >/dev/null 2>&1; then
     break
   fi
   if [ "$i" -eq 60 ]; then

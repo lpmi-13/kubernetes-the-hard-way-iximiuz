@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CILIUM_CLI_VERSION="v0.19.2"
+CILIUM_CLI_VERSION="v0.18.9"
 HELM_VERSION="v3.17.0"
 
 has_working_binary() {

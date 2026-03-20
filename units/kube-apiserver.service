@@ -29,7 +29,6 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --requestheader-extra-headers-prefix=X-Remote-Extra- \
   --requestheader-group-headers=X-Remote-Group \
   --requestheader-username-headers=X-Remote-User \
-  --runtime-config='api/all=true' \
   --service-account-key-file=/var/lib/kubernetes/service-accounts.crt \
   --service-account-signing-key-file=/var/lib/kubernetes/service-accounts.key \
   --service-account-issuer=https://server.kubernetes.local:6443 \

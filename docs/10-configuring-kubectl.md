@@ -32,10 +32,10 @@ cp admin.kubeconfig ~/.kube/config
 
 ## Verification
 
-Check the health of the remote cluster:
+Check the readiness of the remote cluster:
 
 ```sh
-kubectl get componentstatuses
+kubectl get --raw='/readyz?verbose'
 ```
 
 List the nodes:
@@ -48,11 +48,11 @@ you should see output like this
 
 ```sh
 NAME       STATUS   ROLES    AGE     VERSION
-worker-1   Ready    <none>   12m     v1.32.3
-worker-2   Ready    <none>   10m     v1.32.3
-worker-3   Ready    <none>   8m14s   v1.32.3
-worker-4   Ready    <none>   7m44s   v1.32.3
-worker-5   Ready    <none>   7m13s   v1.32.3
+worker-1   Ready    <none>   12m     v1.34.5
+worker-2   Ready    <none>   10m     v1.34.5
+worker-3   Ready    <none>   8m14s   v1.34.5
+worker-4   Ready    <none>   7m44s   v1.34.5
+worker-5   Ready    <none>   7m13s   v1.34.5
 ```
 
 Next: [Deploying Cilium and Hubble](11-cilium-hubble.md)

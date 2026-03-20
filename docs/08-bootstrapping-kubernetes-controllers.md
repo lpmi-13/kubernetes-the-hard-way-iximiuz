@@ -194,7 +194,6 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --requestheader-extra-headers-prefix=X-Remote-Extra- \\
   --requestheader-group-headers=X-Remote-Group \\
   --requestheader-username-headers=X-Remote-User \\
-  --runtime-config='api/all=true' \\
   --service-account-key-file=/var/lib/kubernetes/service-accounts.crt \\
   --service-account-signing-key-file=/var/lib/kubernetes/service-accounts.key \\
   --service-account-issuer=https://server.kubernetes.local:6443 \\
@@ -350,10 +349,10 @@ kubectl apply --kubeconfig /root/admin.kubeconfig -f /root/kube-api-server-to-ku
 
 ## Verification
 
-From controller-1, verify component health:
+From controller-1, verify API server readiness:
 
 ```sh
-kubectl get componentstatuses --kubeconfig /root/admin.kubeconfig
+kubectl get --raw='/readyz?verbose' --kubeconfig /root/admin.kubeconfig
 ```
 
 From the jumpbox, verify the API server through HAProxy:

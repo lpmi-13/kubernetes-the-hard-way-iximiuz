@@ -42,7 +42,7 @@ By setting `--node-ip` to the Tailscale address, the Kubernetes node object adve
 ## Install Cilium CLI and Helm
 
 ```bash
-CILIUM_CLI_VERSION="v0.19.2"
+CILIUM_CLI_VERSION="v0.18.9"
 HELM_VERSION="v3.17.0"
 
 has_working_binary() {
@@ -95,7 +95,7 @@ helm version --short
 ```
 
 This installs:
-- **Cilium CLI** (v0.19.2) — for checking Cilium status and connectivity
+- **Cilium CLI** (v0.18.9) — for checking Cilium status and connectivity
 - **Helm** (v3.17.0) — for rendering Cilium's Kubernetes manifests
 
 The install uses a temporary file plus `mv` to avoid leaving behind a partially written binary if the download is interrupted.
@@ -103,12 +103,12 @@ The install uses a temporary file plus `mv` to avoid leaving behind a partially 
 ## Deploy Cilium
 
 ```bash
-CILIUM_VERSION="1.16.5"
+CILIUM_VERSION="1.19.1"
 
 node_output="$(kubectl get nodes 2>/dev/null || true)"
 worker_count="$(printf '%s\n' "${node_output}" | awk '$1 ~ /^worker-/ {count++} END {print count+0}')"
-if [ "${worker_count}" -lt 9 ]; then
-  echo "expected 9 registered worker nodes before install, found ${worker_count}" >&2
+if [ "${worker_count}" -lt 5 ]; then
+  echo "expected 5 registered worker nodes before install, found ${worker_count}" >&2
   printf '%s\n' "${node_output}" >&2
   exit 1
 fi
@@ -154,7 +154,7 @@ This uses `helm template` to render Cilium manifests with these key settings, th
 | `hubble.enabled` | `true` | Enable Hubble flow observability |
 | `hubble.relay.enabled` | `true` | Deploy Hubble Relay for centralized flow access |
 | `operator.replicas` | `1` | Single Cilium operator replica |
-| `ipam.mode` | `kubernetes` | Use Kubernetes-native IPAM |
+| `ipam.mode` | `cluster-pool` | Use Cilium's cluster-pool IPAM |
 | `ipam.operator.clusterPoolIPv4PodCIDRList` | `10.200.0.0/16` | Pod CIDR range |
 | `ipam.operator.clusterPoolIPv4MaskSize` | `24` | Per-node pod CIDR size |
 
@@ -166,7 +166,7 @@ After deployment, verify that Cilium is healthy:
 cilium status
 ```
 
-All 9 Cilium agents should be reporting as healthy, and Hubble Relay should be connected.
+All worker nodes should be reporting healthy Cilium agents, and Hubble Relay should be connected.
 
 Test cross-worker pod connectivity:
 

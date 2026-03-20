@@ -38,6 +38,13 @@ rules:
   - list
   - watch
 - apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - list
+  - watch
+- apiGroups:
   - ""
   resources:
   - nodes
@@ -124,7 +131,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: coredns/coredns:1.6.3
+        image: coredns/coredns:1.13.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:

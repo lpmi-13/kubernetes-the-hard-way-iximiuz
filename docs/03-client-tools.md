@@ -50,16 +50,16 @@ and now we can expand the tar files and move the binaries
 ```sh
 ARCH=$(dpkg --print-architecture)
 mkdir -p downloads/{client,controller,worker}
-tar -xvf downloads/crictl-v1.32.0-linux-${ARCH}.tar.gz \
+tar -xvf downloads/crictl-v1.34.0-linux-${ARCH}.tar.gz \
   -C downloads/worker/
-tar -xvf downloads/containerd-2.1.0-beta.0-linux-${ARCH}.tar.gz \
+tar -xvf downloads/containerd-2.1.5-linux-${ARCH}.tar.gz \
   --strip-components 1 \
   -C downloads/worker/
-tar -xvf downloads/etcd-v3.6.0-rc.3-linux-${ARCH}.tar.gz \
+tar -xvf downloads/etcd-v3.6.8-linux-${ARCH}.tar.gz \
   -C downloads/ \
   --strip-components 1 \
-  etcd-v3.6.0-rc.3-linux-${ARCH}/etcdctl \
-  etcd-v3.6.0-rc.3-linux-${ARCH}/etcd
+  etcd-v3.6.8-linux-${ARCH}/etcdctl \
+  etcd-v3.6.8-linux-${ARCH}/etcd
 mv downloads/{etcdctl,kubectl} downloads/client/
 mv downloads/{etcd,kube-apiserver,kube-controller-manager,kube-scheduler} \
   downloads/controller/
@@ -93,8 +93,7 @@ You'll now be able to run the `kubectl` command and see the version info:
 kubectl version --client
 ```
 ```sh
-Client Version: v1.32.3
-Kustomize Version: v5.5.0
+Client Version: v1.34.5
 ```
 
 ## Making sure we can access the other machines from the jumpbox

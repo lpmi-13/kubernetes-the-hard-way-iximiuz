@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CILIUM_VERSION="1.16.5"
+CILIUM_VERSION="1.19.1"
 
 require_worker_nodes() {
   local expected="${1:-5}"
